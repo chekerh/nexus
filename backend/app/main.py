@@ -70,6 +70,14 @@ async def cancel_processing(process_id: str):
         return {"status": "Process terminated"}
     return JSONResponse(status_code=404, content={"error": "Process ID not found"})
 
+@app.get("/status/{process_id}")
+async def get_status(process_id: str):
+    """Checks the status and results of a task."""
+    result = processing_results.get(process_id)
+    if not result:
+        return JSONResponse(status_code=404, content={"error": "Process ID not found"})
+    return result
+
 def add_thought(process_id: str, thought: str):
     """Helper to add a 'thinking' log for the UI."""
     if process_id in processing_results:
