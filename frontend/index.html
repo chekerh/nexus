@@ -39,10 +39,14 @@
 
             <!-- Status Section -->
             <section id="status-section" class="status-section hidden">
-                <div class="loader-container">
-                    <div class="spinner"></div>
-                    <p id="status-message">Thinking...</p>
+                <div class="thinking-header">
+                    <span class="pulse-dot"></span>
+                    <h2 id="status-title">AI Processing...</h2>
                 </div>
+                <div id="thinking-console" class="thinking-console">
+                    <!-- Thoughts will be injected here -->
+                </div>
+                <button class="btn btn-danger" id="stop-btn">Stop Analysis</button>
             </section>
 
             <!-- Results Section -->

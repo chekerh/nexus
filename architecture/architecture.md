@@ -19,11 +19,16 @@ PubReelo is a local-first AI pipeline designed to automate the creation of viral
 
 ### Intelligence Layer (Ollama / Qwen)
 - **Model:** `qwen3:30b` (running via local Ollama instance).
-- **Role:** Analyzes raw transcripts to identify viral "hooks" and generate high-engagement social media captions.
+- **Role:** Acts as the "Creative Director." It parses transcripts with timestamps to identify high-retention segments and generates viral strategies.
+- **Phase 3 Enhancement:** Now provides "thinking streams" to the UI to show the reasoning process.
+
+### Video Editing Engine (FFmpeg)
+- **Role:** Performs precise, frame-accurate re-encoding of video segments based on AI-determined timestamps.
 
 ## 3. Storage
-- **Local Data (`backend/data/`):** Temporary storage for uploaded video files and extracted audio chunks. Files are cleaned up after processing to save disk space.
+- **Local Data (`backend/data/`):** Temporary storage for uploads.
+- **Clips Library (`backend/data/clips/`):** Permanent (per session) storage for generated viral reels.
 
-## 4. Integration
-- **FFmpeg:** Used for pre-processing videos and extracting 16kHz mono audio required for Whisper.cpp.
-- **REST API:** Standard interface for communication between the Frontend and the Backend.
+## 4. Interaction Model (Phase 3)
+- **Real-time Feedback:** Instead of static loaders, the system now provides a "Thinking Console" showing the AI's step-by-step logic.
+- **User Control:** Added "Stop Analysis" capability to immediately terminate resource-heavy AI or FFmpeg processes.

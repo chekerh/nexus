@@ -7,7 +7,12 @@ const statusMessage = document.getElementById('status-message');
 const transcriptContent = document.getElementById('transcript-content');
 const analysisContent = document.getElementById('analysis-content');
 
+const stopBtn = document.getElementById('stop-btn');
+const thinkingConsole = document.getElementById('thinking-console');
+const statusTitle = document.getElementById('status-title');
+
 let selectedFile = null;
+let currentProcessId = null;
 
 // Handle File Selection
 dropzone.onclick = () => fileInput.click();
@@ -31,7 +36,8 @@ processBtn.onclick = async () => {
     processBtn.disabled = true;
     statusSection.classList.remove('hidden');
     resultsSection.classList.add('hidden');
-    statusMessage.innerText = "Uploading and Transcribing (Whisper.cpp)...";
+    thinkingConsole.innerHTML = '<div class="thinking-line">Initializing local AI engine...</div>';
+    statusTitle.innerText = "AI Processing...";
 
     try {
         const response = await fetch('/process', {
@@ -40,11 +46,23 @@ processBtn.onclick = async () => {
         });
 
         const { process_id } = await response.json();
+        currentProcessId = process_id;
         pollStatus(process_id);
     } catch (err) {
         console.error(err);
-        statusMessage.innerText = "Error uploading file.";
+        thinkingConsole.innerHTML += `<div class="thinking-line error">Error uploading file: ${err}</div>`;
         processBtn.disabled = false;
+    }
+};
+
+// Handle Stop Analysis
+stopBtn.onclick = async () => {
+    if (!currentProcessId) return;
+    try {
+        await fetch(`/cancel/${currentProcessId}`, { method: 'POST' });
+        statusTitle.innerText = "Stopping Analysis...";
+    } catch (err) {
+        console.error("Stop failed", err);
     }
 };
 
@@ -55,22 +73,39 @@ async function pollStatus(processId) {
             const res = await fetch(`/status/${processId}`);
             const data = await res.json();
 
+            // Update Thinking Console with new thoughts
+            if (data.thinking) {
+                const currentThoughts = thinkingConsole.querySelectorAll('.thinking-line').length;
+                if (data.thinking.length > currentThoughts) {
+                    for (let i = currentThoughts; i < data.thinking.length; i++) {
+                        const line = document.createElement('div');
+                        line.className = 'thinking-line';
+                        line.innerText = `> ${data.thinking[i]}`;
+                        thinkingConsole.appendChild(line);
+                        thinkingConsole.scrollTop = thinkingConsole.scrollHeight;
+                    }
+                }
+            }
+
             if (data.status === 'completed') {
                 clearInterval(poll);
                 showResults(data);
             } else if (data.status === 'error') {
                 clearInterval(poll);
-                statusMessage.innerText = `Critical Error: ${data.error}`;
+                statusTitle.innerText = "Process Failed";
+                thinkingConsole.innerHTML += `<div class="thinking-line error">CRITICAL ERROR: ${data.error}</div>`;
                 processBtn.disabled = false;
-            } else {
-                // Show granular status updates from the backend
-                statusMessage.innerText = data.status || "Processing...";
+            } else if (data.status === 'cancelled') {
+                clearInterval(poll);
+                statusTitle.innerText = "Analysis Cancelled";
+                thinkingConsole.innerHTML += `<div class="thinking-line">Process terminated by user. Resources released.</div>`;
+                processBtn.disabled = false;
             }
         } catch (err) {
             clearInterval(poll);
             console.error(err);
         }
-    }, 2000);
+    }, 1500);
 }
 
 const clipsContainer = document.getElementById('clips-container');

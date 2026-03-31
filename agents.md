@@ -10,14 +10,11 @@ This document defines the specialized AI entities that form the PubReelo Intelli
 
 ## 2. Strategist Agent (The Analyst)
 - **Model:** Qwen3:30b (Ollama)
-- **Role:** Viral content strategist and creative director.
-- **Goal:** Identify 3 high-impact hooks and provide exact start/end timestamps for cutting.
-- **Focus Areas:** 
-    - Viral Hook Identification (First 3 seconds).
-    - Engagement-driven Captioning.
-    - **Temporal Precision:** Accurate identification of video timestamps from transcript context.
+- **Role:** Creative Director & Content Strategist.
+- **Goal:** Identify retention-driven segments and explain *why* they were chosen.
+- **Expressiveness (Phase 3):** Now provides real-time "thinking logs" (e.g., "Evaluating comedic timing at 0:45", "Analyzing retention drop-off") to keep the user engaged.
 
 ## 3. Workflow Manager (The Orchestrator)
-- **Role:** FastAPI Backend logic & Video Editor.
-- **Goal:** Manage the lifecycle of a request, including the invocation of FFmpeg for Phase 2 video cutting.
-- **New Task:** Perform lossless video extraction based on the Strategist's timestamps.
+- **Role:** Controller & Editor.
+- **Goal:** Manage execution lifecycle with cancellation support.
+- **Interruptibility:** Can now handle "Stop Analysis" requests to kill background processes.
