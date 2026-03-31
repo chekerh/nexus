@@ -36,18 +36,22 @@ def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active
         
         try:
             cmd = ["ffmpeg", "-y", "-ss", str(start), "-i", video_path, "-t", str(duration), "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-c:a", "aac", "-b:a", "128k", output_path]
-            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            process = subprocess.Popen(
+                cmd, 
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.STDOUT, 
+                text=True,
+                preexec_fn=os.setsid
+            )
             
             if process_id and active_pids is not None:
                 active_pids[process_id] = process.pid
-            
-            # We don't need every line of FFmpeg (it's very chatty), but we'll log it for 'full analysis'
-            for line in process.stdout:
-                if "frame=" in line and thought_callback:
-                    # Optional: filter to only show major progress
-                    pass
                 
-            process.communicate()
+            # Read output if needed for progress
+            for line in process.stdout:
+                pass
+                
+            process.wait()
             if process.returncode == 0:
                 output_clips.append(output_name)
         except Exception as e:

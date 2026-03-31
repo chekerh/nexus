@@ -52,20 +52,21 @@ async def process_video(background_tasks: BackgroundTasks, file: UploadFile = Fi
 
 @app.post("/cancel/{process_id}")
 async def cancel_processing(process_id: str):
-    """Hard-kills the running subprocesses and cancels the task."""
+    """Hard-kills the running subprocess group and cancels the task."""
     if process_id in processing_results:
         processing_results[process_id]["cancelled"] = True
         processing_results[process_id]["status"] = "cancelled"
         
-        # Kill active subprocess if any
+        # Kill active subprocess group if any
         pid = active_pids.get(process_id)
         if pid:
             try:
                 import signal
-                os.kill(pid, signal.SIGTERM)
-                print(f"Killed process {pid} for {process_id}")
+                # Use os.killpg to kill the entire group started with os.setsid
+                os.killpg(os.getpgid(pid), signal.SIGKILL)
+                print(f"Hard-killed process group for PID {pid}")
             except Exception as e:
-                print(f"Failed to kill process {pid}: {e}")
+                print(f"Failed to kill process group {pid}: {e}")
         
         return {"status": "Process terminated"}
     return JSONResponse(status_code=404, content={"error": "Process ID not found"})
@@ -78,22 +79,50 @@ async def get_status(process_id: str):
         return JSONResponse(status_code=404, content={"error": "Process ID not found"})
     return result
 
+def get_ai_commentary(line: str) -> str:
+    """Provides a human-like strategist thought based on live transcript lines."""
+    line_lower = line.lower()
+    
+    # Simple semantic triggers for 'real talking' thoughts
+    if any(k in line_lower for k in ["ferrari", "bugatti", "car", "lamborghini"]):
+        return "Strategist Insight: Automotive luxury detected. High-value niche. Visuals should emphasize speed/status."
+    if any(k in line_lower for k in ["money", "bought", "£", "$", "price"]):
+        return "Strategist Insight: Financial stakes are being established. This builds authority and viewer envy."
+    if any(k in line_lower for k in ["accident", "crash", "wrecked", "problem", "broken"]):
+        return "Strategist Insight: Conflict detected! This is a classic retention hook. Hook potential is 8.5/10."
+    if any(k in line_lower for k in ["miami", "florida", "travel", "house"]):
+        return "Strategist Insight: Lifestyle/Vlog element. Good for building personality and audience trust."
+    if any(k in line_lower for k in ["radiator", "battery", "engine", "work", "fix"]):
+        return "Strategist Insight: Technical deep-dive occurring. This captures the 'How-To' and engineering enthusiast demographic."
+    
+    return ""
+
 def add_thought(process_id: str, thought: str):
-    """Helper to add a 'thinking' log for the UI."""
+    """Helper to add a 'thinking' log for the UI with narrative context."""
     if not process_id or process_id not in processing_results:
         return
         
-    # Clean up common CLI noise to keep it readable but detailed
     clean_thought = thought.strip()
     if not clean_thought:
         return
 
-    # Avoid duplicate consecutive lines
+    # If it's a Whisper line, inject AI commentary
+    if "Whisper Perception:" in clean_thought:
+        # Extract the transcript text
+        match = re.search(r'\]\s+(.*)', clean_thought)
+        if match:
+            commentary = get_ai_commentary(match.group(1))
+            if commentary:
+                # Add the commentary first to show it's 'thinking' about that line
+                if not processing_results[process_id]["thinking"] or processing_results[process_id]["thinking"][-1] != commentary:
+                    processing_results[process_id]["thinking"].append(commentary)
+
+    # Avoid duplicate thoughts
     if not processing_results[process_id]["thinking"] or processing_results[process_id]["thinking"][-1] != clean_thought:
         processing_results[process_id]["thinking"].append(clean_thought)
         processing_results[process_id]["status"] = clean_thought
-        # Keep only last 100 thoughts to prevent memory bloat
-        if len(processing_results[process_id]["thinking"]) > 100:
+        # Keep it snappy
+        if len(processing_results[process_id]["thinking"]) > 150:
             processing_results[process_id]["thinking"].pop(0)
 
 def run_pipeline_sync(process_id: str, video_path: str):

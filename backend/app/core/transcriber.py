@@ -38,9 +38,10 @@ def transcribe_video(video_path: str, process_id: str = None, active_pids: dict 
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT, # Merge stderr to see progress info
+            stderr=subprocess.STDOUT, 
             text=True,
-            bufsize=1 # Line buffered
+            bufsize=1,
+            preexec_fn=os.setsid # Create a new process group
         )
         
         # Register PID
