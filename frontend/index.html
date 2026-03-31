@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus-UGC Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">Nexus-UGC</div>
+            <nav>
+                <a href="#" class="nav-item active">AI Pipeline</a>
+                <a href="#" class="nav-item disabled">Account Groups</a>
+                <a href="#" class="nav-item disabled">History</a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="main-header">
+                <h1>Viral Strategy Engine</h1>
+                <p>Upload a video to generate local AI transcripts and hooks.</p>
+            </header>
+
+            <!-- Upload Section -->
+            <section class="upload-section card">
+                <div class="upload-dropzone" id="dropzone">
+                    <p>Drag and drop your video file or click to browse.</p>
+                    <input type="file" id="file-input" accept="video/*" hidden>
+                </div>
+                <button class="btn btn-primary" id="process-btn" disabled>Start Analysis</button>
+            </section>
+
+            <!-- Status Section -->
+            <section id="status-section" class="status-section hidden">
+                <div class="loader-container">
+                    <div class="spinner"></div>
+                    <p id="status-message">Thinking...</p>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section id="results-section" class="results-section hidden">
+                <div class="grid-layout">
+                    <!-- Transcription Column -->
+                    <div class="card result-card">
+                        <h3>Local Transcript</h3>
+                        <div id="transcript-content" class="text-content"></div>
+                    </div>
+
+                    <!-- AI Strategy Column -->
+                    <div class="card result-card">
+                        <h3>Viral Hooks & Captions</h3>
+                        <div id="analysis-content" class="text-content"></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
