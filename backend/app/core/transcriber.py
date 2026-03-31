@@ -28,9 +28,9 @@ def transcribe_video(video_path: str) -> Optional[str]:
         return None
 
     try:
-        # -nt: no timestamps, -np: no prints (results only)
+        # -np: no prints (results only), timestamps enabled by default
         result = subprocess.run(
-            [settings.WHISPER_BINARY_PATH, "-m", settings.WHISPER_MODEL_PATH, "-f", audio_path, "-nt", "-np"],
+            [settings.WHISPER_BINARY_PATH, "-m", settings.WHISPER_MODEL_PATH, "-f", audio_path, "-np"],
             capture_output=True,
             text=True,
             check=True

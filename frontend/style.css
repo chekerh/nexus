@@ -181,3 +181,61 @@ body {
 }
 
 .hidden { display: none; }
+
+/* Clips Grid */
+.clips-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+.clip-card {
+    padding: 1.25rem;
+}
+
+.clip-card h4 {
+    margin-bottom: 0.75rem;
+    font-size: 1.1rem;
+    color: var(--primary);
+}
+
+.clip-card video {
+    border-radius: 0.5rem;
+    background-color: #000;
+    margin-bottom: 1rem;
+}
+
+.clip-info p {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    margin-bottom: 1rem;
+    min-height: 3.5rem;
+}
+
+.btn-secondary {
+    background-color: var(--card-bg);
+    border: 1px solid #475569;
+    color: var(--text);
+    font-size: 0.85rem;
+}
+
+.btn-secondary:hover {
+    background-color: #334155;
+    border-color: var(--primary);
+}
+
+.hook-item {
+    padding: 1rem 0;
+    font-size: 0.9rem;
+}
+
+.hook-item strong {
+    color: var(--primary);
+}
+
+hr {
+    border: 0;
+    border-top: 1px solid #334155;
+}
+

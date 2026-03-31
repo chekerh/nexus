@@ -5,11 +5,18 @@ from fastapi.middleware.cors import CORSMiddleware
 import shutil
 import os
 import uuid
+import re
 from .core.config import settings
 from .core.transcriber import transcribe_video
 from .core.analyst import analyze_transcript
+from .core.video_editor import cut_video
 
 app = FastAPI(title="Nexus-UGC Dashboard")
+
+# Serve generated clips
+CLIPS_DIR = os.path.join(settings.UPLOAD_DIR, "clips")
+os.makedirs(CLIPS_DIR, exist_ok=True)
+app.mount("/video_clips", StaticFiles(directory=CLIPS_DIR), name="clips")
 
 # Enable CORS for local development
 app.add_middleware(
@@ -48,7 +55,7 @@ async def get_status(process_id: str):
     return result
 
 async def run_pipeline(process_id: str, video_path: str):
-    """Executes the Whisper -> Qwen pipeline with granular status updates."""
+    """Executes the Whisper -> Qwen -> FFmpeg pipeline."""
     try:
         # Step 1: Transcription
         processing_results[process_id]["status"] = "Extracting audio and transcribing..."
@@ -57,20 +64,43 @@ async def run_pipeline(process_id: str, video_path: str):
             processing_results[process_id] = {"status": "error", "error": "Transcription failed"}
             return
 
-        # Step 2: AI Analysis
+        # Step 2: AI Analysis (JSON)
         processing_results[process_id]["status"] = "Analyzing transcript for viral hooks (Ollama)..."
         analysis = analyze_transcript(transcript)
-        if not analysis:
-            processing_results[process_id] = {"status": "error", "error": "AI Analysis failed", "transcript": transcript}
+        
+        # DEBUG: log analysis to console
+        print(f"Ollama Analysis Result for {process_id}: {analysis}")
+
+        if not analysis or "hooks" not in analysis:
+            processing_results[process_id] = {
+                "status": "error", 
+                "error": "AI Analysis failed to find hooks. Check model output.", 
+                "transcript": transcript,
+                "raw_output": str(analysis)
+            }
             return
+
+        # Step 3: Video Cutting (FFmpeg)
+        processing_results[process_id]["status"] = "Generating 3 viral clips (FFmpeg)..."
+        clips = cut_video(video_path, analysis["hooks"])
+        
+        if not clips:
+             processing_results[process_id] = {
+                "status": "error", 
+                "error": "FFmpeg failed to generate any clips. Check timestamps.",
+                "analysis": analysis
+            }
+             return
 
         # Success!
         processing_results[process_id] = {
             "status": "completed",
             "transcript": transcript,
             "analysis": analysis,
+            "clips": clips,
             "filename": os.path.basename(video_path)
         }
+        print(f"Pipeline completed successfully for {process_id}. Clips: {clips}")
         
     except Exception as e:
         processing_results[process_id] = {"status": "error", "error": str(e)}

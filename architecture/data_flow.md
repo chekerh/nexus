@@ -23,8 +23,14 @@ The PubReelo system follows a strictly local, sequential pipeline for processing
 - **System Prompt:** Instructs the model to act as a viral strategist, identifying 3 hooks and writing captions.
 - Status is updated to "Analyzing transcript for viral hooks (Ollama)...".
 
-## 5. Result Delivery & Cleanup
-- The final transcript and AI analysis are stored in the `processing_results` map.
+## 5. Automated Video Cutting (Phase 2)
+- The backend parses the JSON output from the Strategist Agent to extract 3 sets of timestamps.
+- **FFmpeg** is invoked for each hook to perform a "lossless cut" (using stream copying).
+- **Command:** `ffmpeg -ss {start} -to {end} -i {input} -c copy {output}`.
+- Three new video files are generated and stored in a public `clips/` directory.
+
+## 6. Result Delivery & Cleanup
+- The final transcript, AI analysis, and links to the 3 video clips are stored in the results.
 - Status is updated to `completed`.
-- Temporary video and audio files are deleted from `backend/data/`.
-- The Frontend polls the `/status/{id}` endpoint, detects completion, and renders the content.
+- Temporary raw audio and original upload files are managed/cleaned up.
+- The Frontend renders the 3 video players for immediate preview.
