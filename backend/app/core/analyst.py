@@ -5,22 +5,20 @@ from typing import Optional, List, Dict
 from .config import settings
 
 def analyze_transcript(transcript: str) -> Optional[Dict]:
-    """Analyzes transcript using local Ollama instance for viral hooks and captions."""
+    """Analyzes transcript using local Ollama instance for viral hooks and strategy."""
     system_prompt = (
-        "You are an expert viral content strategist. You will receive a transcript where each line starts with a timestamp in the format '[MM:SS.mmm]'. "
-        "Your goal is to identify 3 high-impact viral hooks from this content. "
-        "For each hook: "
-        "1. Identify the EXACT start and end seconds by converting the [MM:SS.mmm] format (e.g., [00:15.500] is 15.5). "
-        "2. Write a viral-optimized caption. "
-        "3. Provide a catchy hook name. "
-        "Return ONLY a raw JSON object (no markdown, no preamble) in this format: "
+        "You are an expert viral content strategist. You will receive a transcript with timestamps. "
+        "Your goal is to identify 3 high-impact viral hooks. "
+        "First, provide a 1-2 sentence 'Strategy Insight' about the video's potential. "
+        "Then, identify the 3 hooks with exact start/end seconds and captions. "
+        "Return your response in this EXACT format: "
+        "STRATEGY: <Your insight here>\n"
+        "JSON: "
         '{"hooks": [{"start": float, "end": float, "hook_name": "string", "caption": "string"}]}'
     )
 
     try:
-        # Pre-process transcript to ensure it's not too long for the model context
-        # and to highlight the format
-        processed_transcript = transcript[:15000] # Cap to avoid context overflow if needed
+        processed_transcript = transcript[:15000] 
 
         response = ollama.chat(
             model=settings.OLLAMA_MODEL,
@@ -31,11 +29,22 @@ def analyze_transcript(transcript: str) -> Optional[Dict]:
         )
         content = response['message']['content'].strip()
 
-        # Robust JSON extraction
+        # Extract Strategy and JSON
+        strategy = "Analyzing content structure..."
+        if "STRATEGY:" in content:
+            strategy_match = re.search(r'STRATEGY:(.*?)(JSON:|$)', content, re.DOTALL)
+            if strategy_match:
+                strategy = strategy_match.group(1).strip()
+
+        # We'll return the strategy along with the hooks
         json_match = re.search(r'\{.*\}', content, re.DOTALL)
         if json_match:
-            return json.loads(json_match.group())
-        return json.loads(content)
+            data = json.loads(json_match.group())
+            data['strategy_thought'] = strategy
+            return data
+
+        return None
+
     except Exception as e:
         print(f"Ollama analysis failed: {str(e)}")
         return None

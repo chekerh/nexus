@@ -26,8 +26,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# In-memory storage for processing results
+# In-memory storage for processing results and active PIDs
 processing_results = {}
+active_pids = {} # {process_id: pid}
 
 @app.post("/process")
 async def process_video(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
@@ -40,57 +41,72 @@ async def process_video(background_tasks: BackgroundTasks, file: UploadFile = Fi
     
     processing_results[process_id] = {
         "status": "Starting...", 
-        "thinking": ["Initializing PubReelo pipeline...", "Allocating local resources..."],
+        "thinking": ["System online. Preparing neural pathways..."],
         "filename": file.filename,
         "cancelled": False
     }
     
-    background_tasks.add_task(run_pipeline, process_id, video_path)
+    # We use a regular def for run_pipeline so it runs in a separate thread
+    background_tasks.add_task(run_pipeline_sync, process_id, video_path)
     return {"process_id": process_id}
 
 @app.post("/cancel/{process_id}")
 async def cancel_processing(process_id: str):
-    """Signals the pipeline to stop for a specific process ID."""
+    """Hard-kills the running subprocesses and cancels the task."""
     if process_id in processing_results:
         processing_results[process_id]["cancelled"] = True
         processing_results[process_id]["status"] = "cancelled"
-        return {"status": "Cancellation requested"}
+        
+        # Kill active subprocess if any
+        pid = active_pids.get(process_id)
+        if pid:
+            try:
+                import signal
+                os.kill(pid, signal.SIGTERM)
+                print(f"Killed process {pid} for {process_id}")
+            except Exception as e:
+                print(f"Failed to kill process {pid}: {e}")
+        
+        return {"status": "Process terminated"}
     return JSONResponse(status_code=404, content={"error": "Process ID not found"})
-
-@app.get("/status/{process_id}")
-async def get_status(process_id: str):
-    """Checks the status and results of a task."""
-    result = processing_results.get(process_id)
-    if not result:
-        return JSONResponse(status_code=404, content={"error": "Process ID not found"})
-    return result
 
 def add_thought(process_id: str, thought: str):
     """Helper to add a 'thinking' log for the UI."""
     if process_id in processing_results:
-        processing_results[process_id]["thinking"].append(thought)
-        processing_results[process_id]["status"] = thought
+        # Avoid duplicate thoughts
+        if not processing_results[process_id]["thinking"] or processing_results[process_id]["thinking"][-1] != thought:
+            processing_results[process_id]["thinking"].append(thought)
+            processing_results[process_id]["status"] = thought
 
-async def run_pipeline(process_id: str, video_path: str):
-    """Executes the pipeline with cancellation checks."""
+def run_pipeline_sync(process_id: str, video_path: str):
+    """Synchronous pipeline runner to allow thread-based background execution."""
     try:
         def check_cancelled():
             if processing_results.get(process_id, {}).get("cancelled"):
                 raise Exception("Process cancelled by user")
 
+        # Initial AI Strategy Thought
+        check_cancelled()
+        filename = processing_results[process_id]["filename"]
+        add_thought(process_id, f"Scanning metadata... Video: '{filename}' detected.")
+        add_thought(process_id, "Qwen Strategy: I'm going to look for high-energy peaks and semantic hooks that work for short-form retention.")
+
         # Step 1: Transcription
         check_cancelled()
-        add_thought(process_id, "Brain is warming up... extracting audio frequencies.")
-        add_thought(process_id, "Whisper.cpp is now listening to your content...")
-        transcript = transcribe_video(video_path)
+        add_thought(process_id, "Whisper.cpp Perception: Listening to the audio track to map out the narrative structure...")
+        
+        # We need a way to track the PID of the subprocess
+        # We'll modify the core functions to accept the process_id
+        transcript = transcribe_video(video_path, process_id, active_pids)
+        
         if not transcript:
-            processing_results[process_id].update({"status": "error", "error": "Transcription failed"})
+            if not processing_results[process_id].get("cancelled"):
+                processing_results[process_id].update({"status": "error", "error": "Transcription failed"})
             return
 
-        # Step 2: AI Analysis (JSON)
+        # Step 2: AI Analysis
         check_cancelled()
-        add_thought(process_id, "Got the transcript! Decoding the viral potential...")
-        add_thought(process_id, "Consulting with Qwen3:30b for retention strategies.")
+        add_thought(process_id, "Semantic Analysis: Parsing transcript for 'scroll-stopper' moments...")
         analysis = analyze_transcript(transcript)
         
         if not analysis or "hooks" not in analysis:
@@ -99,29 +115,29 @@ async def run_pipeline(process_id: str, video_path: str):
 
         # Step 3: Video Cutting
         check_cancelled()
-        add_thought(process_id, f"Found {len(analysis.get('hooks', []))} potential goldmines.")
-        add_thought(process_id, "FFmpeg is performing frame-accurate surgery...")
-        clips = cut_video(video_path, analysis["hooks"])
+        add_thought(process_id, f"Editor Monologue: Found {len(analysis.get('hooks', []))} viral segments. Initiating surgical cuts.")
+        clips = cut_video(video_path, analysis["hooks"], process_id, active_pids)
         
         if not clips:
-             processing_results[process_id].update({"status": "error", "error": "FFmpeg failed to generate clips."})
+             if not processing_results[process_id].get("cancelled"):
+                processing_results[process_id].update({"status": "error", "error": "FFmpeg failed to generate clips."})
              return
 
         # Success!
         check_cancelled()
+        add_thought(process_id, "Pipeline complete. All clips processed and verified.")
         processing_results[process_id].update({
             "status": "completed",
             "transcript": transcript,
             "analysis": analysis,
-            "clips": clips,
-            "filename": os.path.basename(video_path)
+            "clips": clips
         })
-        print(f"Pipeline completed for {process_id}")
         
     except Exception as e:
-        status = "cancelled" if str(e) == "Process cancelled by user" else "error"
+        status = "cancelled" if "cancelled" in str(e).lower() else "error"
         processing_results[process_id].update({"status": status, "error": str(e)})
     finally:
+        active_pids.pop(process_id, None)
         if os.path.exists(video_path):
             os.remove(video_path)
 

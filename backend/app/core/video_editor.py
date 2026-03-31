@@ -12,8 +12,8 @@ def sanitize_filename(filename: str) -> str:
     clean_name = re.sub(r'[^\w\-]', '_', name)
     return clean_name
 
-def cut_video(video_path: str, hooks: List[Dict]) -> List[str]:
-    """Cuts a video into multiple clips based on start/end timestamps using FFmpeg."""
+def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active_pids: dict = None) -> List[str]:
+    """Cuts a video into multiple clips based on start/end timestamps using FFmpeg with PID tracking."""
     output_clips = []
     
     # Sanitize the base name for the output files
@@ -25,6 +25,11 @@ def cut_video(video_path: str, hooks: List[Dict]) -> List[str]:
     os.makedirs(clips_dir, exist_ok=True)
 
     for i, hook in enumerate(hooks):
+        # Check if cancelled before each clip
+        if active_pids is not None and process_id not in active_pids and process_id is not None:
+             # This means the PID was removed, likely due to cancellation
+             break
+
         start = hook.get('start', 0)
         end = hook.get('end', 0)
         
@@ -38,8 +43,6 @@ def cut_video(video_path: str, hooks: List[Dict]) -> List[str]:
         output_path = os.path.join(clips_dir, output_name)
         
         try:
-            # Accurate cut: Re-encode (libx264) to ensure the cut starts exactly at the timestamp.
-            # We use -preset ultrafast for speed since this is a local prototype.
             cmd = [
                 "ffmpeg", "-y",
                 "-ss", str(start),
@@ -53,11 +56,18 @@ def cut_video(video_path: str, hooks: List[Dict]) -> List[str]:
                 output_path
             ]
             
-            subprocess.run(cmd, check=True, capture_output=True)
-            output_clips.append(output_name)
-            print(f"Generated accurate clip: {output_name}")
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             
-        except subprocess.CalledProcessError as e:
-            print(f"Error cutting clip {i+1}: {e.stderr.decode()}")
+            if process_id and active_pids is not None:
+                active_pids[process_id] = process.pid
+                
+            process.communicate()
+            
+            if process.returncode == 0:
+                output_clips.append(output_name)
+                print(f"Generated accurate clip: {output_name}")
+            
+        except Exception as e:
+            print(f"Error cutting clip {i+1}: {str(e)}")
             
     return output_clips
