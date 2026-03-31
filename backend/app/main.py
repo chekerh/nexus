@@ -80,11 +80,21 @@ async def get_status(process_id: str):
 
 def add_thought(process_id: str, thought: str):
     """Helper to add a 'thinking' log for the UI."""
-    if process_id in processing_results:
-        # Avoid duplicate thoughts
-        if not processing_results[process_id]["thinking"] or processing_results[process_id]["thinking"][-1] != thought:
-            processing_results[process_id]["thinking"].append(thought)
-            processing_results[process_id]["status"] = thought
+    if not process_id or process_id not in processing_results:
+        return
+        
+    # Clean up common CLI noise to keep it readable but detailed
+    clean_thought = thought.strip()
+    if not clean_thought:
+        return
+
+    # Avoid duplicate consecutive lines
+    if not processing_results[process_id]["thinking"] or processing_results[process_id]["thinking"][-1] != clean_thought:
+        processing_results[process_id]["thinking"].append(clean_thought)
+        processing_results[process_id]["status"] = clean_thought
+        # Keep only last 100 thoughts to prevent memory bloat
+        if len(processing_results[process_id]["thinking"]) > 100:
+            processing_results[process_id]["thinking"].pop(0)
 
 def run_pipeline_sync(process_id: str, video_path: str):
     """Synchronous pipeline runner to allow thread-based background execution."""
@@ -103,9 +113,8 @@ def run_pipeline_sync(process_id: str, video_path: str):
         check_cancelled()
         add_thought(process_id, "Whisper.cpp Perception: Listening to the audio track to map out the narrative structure...")
         
-        # We need a way to track the PID of the subprocess
-        # We'll modify the core functions to accept the process_id
-        transcript = transcribe_video(video_path, process_id, active_pids)
+        # Pass add_thought as a callback
+        transcript = transcribe_video(video_path, process_id, active_pids, thought_callback=add_thought)
         
         if not transcript:
             if not processing_results[process_id].get("cancelled"):
@@ -123,8 +132,11 @@ def run_pipeline_sync(process_id: str, video_path: str):
 
         # Step 3: Video Cutting
         check_cancelled()
+        if "strategy_thought" in analysis:
+            add_thought(process_id, f"Qwen Strategic Insight: {analysis['strategy_thought']}")
+            
         add_thought(process_id, f"Editor Monologue: Found {len(analysis.get('hooks', []))} viral segments. Initiating surgical cuts.")
-        clips = cut_video(video_path, analysis["hooks"], process_id, active_pids)
+        clips = cut_video(video_path, analysis["hooks"], process_id, active_pids, thought_callback=add_thought)
         
         if not clips:
              if not processing_results[process_id].get("cancelled"):

@@ -19,39 +19,53 @@ def extract_audio(video_path: str, audio_output_path: str) -> bool:
         print(f"Error extracting audio: {e.stderr.decode() if e.stderr else str(e)}")
         return False
 
-def transcribe_video(video_path: str, process_id: str = None, active_pids: dict = None) -> Optional[str]:
-    """Converts video audio to text using a local whisper.cpp binary with PID tracking."""
+def transcribe_video(video_path: str, process_id: str = None, active_pids: dict = None, thought_callback=None) -> Optional[str]:
+    """Converts video audio to text using a local whisper.cpp binary with PID tracking and live streaming."""
     base_name = os.path.basename(video_path)
     audio_path = os.path.join(settings.UPLOAD_DIR, f"{base_name}.wav")
     
+    if thought_callback:
+        thought_callback(process_id, "Whisper-Perception: Extracting 16kHz audio track...")
+
     if not extract_audio(video_path, audio_path):
         return None
 
+    all_output = []
     try:
-        # -np: no prints (results only), timestamps enabled by default
-        cmd = [settings.WHISPER_BINARY_PATH, "-m", settings.WHISPER_MODEL_PATH, "-f", audio_path, "-np"]
+        # -np: no prints (results only), but since we want to see progress, we'll keep it simple
+        cmd = [settings.WHISPER_BINARY_PATH, "-m", settings.WHISPER_MODEL_PATH, "-f", audio_path]
         
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
+            stderr=subprocess.STDOUT, # Merge stderr to see progress info
+            text=True,
+            bufsize=1 # Line buffered
         )
         
         # Register PID
         if process_id and active_pids is not None:
             active_pids[process_id] = process.pid
             
-        stdout, stderr = process.communicate()
+        # Read output line by line as it happens
+        for line in process.stdout:
+            clean_line = line.strip()
+            if clean_line:
+                all_output.append(clean_line)
+                if thought_callback:
+                    # Provide feedback on the transcription progress
+                    thought_callback(process_id, f"Whisper Perception: {clean_line}")
         
-        if process.returncode != 0:
-            print(f"Whisper transcription failed: {stderr}")
+        process.wait()
+        
+        if process.returncode != 0 and not (process_id and process_id not in active_pids):
+            print(f"Whisper transcription failed with code {process.returncode}")
             return None
             
         if os.path.exists(audio_path):
             os.remove(audio_path)
             
-        return stdout.strip()
+        return "\n".join(all_output)
     except Exception as e:
         print(f"Error during transcription: {str(e)}")
         return None

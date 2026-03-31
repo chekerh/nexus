@@ -12,61 +12,44 @@ def sanitize_filename(filename: str) -> str:
     clean_name = re.sub(r'[^\w\-]', '_', name)
     return clean_name
 
-def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active_pids: dict = None) -> List[str]:
-    """Cuts a video into multiple clips based on start/end timestamps using FFmpeg with PID tracking."""
+def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active_pids: dict = None, thought_callback=None) -> List[str]:
+    """Cuts a video into clips with PID tracking and live streaming."""
     output_clips = []
-    
-    # Sanitize the base name for the output files
     raw_base_name = os.path.basename(video_path)
     clean_base_name = sanitize_filename(raw_base_name)
-    
-    # Ensure clips directory exists
     clips_dir = os.path.join(settings.UPLOAD_DIR, "clips")
     os.makedirs(clips_dir, exist_ok=True)
 
     for i, hook in enumerate(hooks):
-        # Check if cancelled before each clip
         if active_pids is not None and process_id not in active_pids and process_id is not None:
-             # This means the PID was removed, likely due to cancellation
              break
 
-        start = hook.get('start', 0)
-        end = hook.get('end', 0)
-        
-        # Calculate duration
+        start, end = hook.get('start', 0), hook.get('end', 0)
         duration = end - start
-        if duration <= 0:
-            print(f"Skipping hook {i+1}: Invalid duration ({duration}s)")
-            continue
+        if duration <= 0: continue
             
         output_name = f"{clean_base_name}_hook_{i+1}.mp4"
         output_path = os.path.join(clips_dir, output_name)
         
+        if thought_callback:
+            thought_callback(process_id, f"FFmpeg: Surgically extracting clip {i+1} ({start}s to {end}s)...")
+        
         try:
-            cmd = [
-                "ffmpeg", "-y",
-                "-ss", str(start),
-                "-i", video_path,
-                "-t", str(duration),
-                "-c:v", "libx264",
-                "-preset", "ultrafast",
-                "-crf", "23",
-                "-c:a", "aac",
-                "-b:a", "128k",
-                output_path
-            ]
-            
-            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            cmd = ["ffmpeg", "-y", "-ss", str(start), "-i", video_path, "-t", str(duration), "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-c:a", "aac", "-b:a", "128k", output_path]
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
             
             if process_id and active_pids is not None:
                 active_pids[process_id] = process.pid
+            
+            # We don't need every line of FFmpeg (it's very chatty), but we'll log it for 'full analysis'
+            for line in process.stdout:
+                if "frame=" in line and thought_callback:
+                    # Optional: filter to only show major progress
+                    pass
                 
             process.communicate()
-            
             if process.returncode == 0:
                 output_clips.append(output_name)
-                print(f"Generated accurate clip: {output_name}")
-            
         except Exception as e:
             print(f"Error cutting clip {i+1}: {str(e)}")
             
