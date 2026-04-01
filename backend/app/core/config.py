@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     OLLAMA_MODEL: str = "qwen2.5:32b"
     UPLOAD_DIR: str = str(BASE_DIR / "backend" / "data")
     FRONTEND_DIR: str = str(BASE_DIR / "frontend")
+    STRATEGIST_PROMPT_FILE: str = str(BASE_DIR / "prompts" / "strategist_system.md")
+    VIRAL_SIGNALS_FILE: str = str(BASE_DIR / "prompts" / "viral_signals.md")
     CLIP_MIN_SECONDS: float = 12.0
     CLIP_MAX_SECONDS: float = 45.0
     CLIP_PADDING_SECONDS: float = 1.5

@@ -1,8 +1,19 @@
 import os
 import subprocess
 import ffmpeg
+import re
 from typing import Optional
 from .config import settings
+
+TIMESTAMPED_LINE_RE = re.compile(r'^\[\d{2}:\d{2}:\d{2}\.\d{3}\s+-->\s+\d{2}:\d{2}:\d{2}\.\d{3}\]\s+.+$')
+
+def _is_noise_line(line: str) -> bool:
+    lowered = line.lower()
+    return (
+        lowered.startswith("whisper_print_timings:")
+        or lowered.startswith("ggml_")
+        or "deallocating" in lowered
+    )
 
 def extract_audio(video_path: str, audio_output_path: str) -> bool:
     """Extracts 16kHz mono WAV from video using ffmpeg for Whisper compatibility."""
@@ -52,10 +63,13 @@ def transcribe_video(video_path: str, process_id: str = None, active_pids: dict 
         for line in process.stdout:
             clean_line = line.strip()
             if clean_line:
-                all_output.append(clean_line)
-                if thought_callback:
-                    # Provide feedback on the transcription progress
-                    thought_callback(process_id, f"Whisper Perception: {clean_line}")
+                if _is_noise_line(clean_line):
+                    continue
+
+                if TIMESTAMPED_LINE_RE.match(clean_line):
+                    all_output.append(clean_line)
+                    if thought_callback:
+                        thought_callback(process_id, f"Whisper Perception: {clean_line}")
         
         process.wait()
         
