@@ -2,6 +2,8 @@ from fastapi import FastAPI, UploadFile, File, BackgroundTasks
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from datetime import datetime, UTC
 import shutil
 import os
 import uuid
@@ -10,6 +12,8 @@ from .core.config import settings
 from .core.transcriber import transcribe_video
 from .core.analyst import analyze_transcript
 from .core.video_editor import cut_video
+from .core.account_store import AccountStore
+from .core.publisher import publish_clip, PublishHistoryStore, SUPPORTED_PLATFORMS
 
 app = FastAPI(title="Nexus-UGC Dashboard")
 
@@ -29,6 +33,23 @@ app.add_middleware(
 # In-memory storage for processing results and active PIDs
 processing_results = {}
 active_pids = {} # {process_id: pid}
+account_store = AccountStore(settings.ACCOUNTS_DB_PATH)
+publish_history_store = PublishHistoryStore(settings.PUBLISH_LOG_PATH)
+
+
+class AccountCreate(BaseModel):
+    platform: str
+    account_name: str
+    auth_mode: str = "manual"
+    notes: str = ""
+
+
+class PublishRequest(BaseModel):
+    platform: str
+    account_id: str
+    clip_filename: str
+    title: str
+    description: str = ""
 
 @app.post("/process")
 async def process_video(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
@@ -78,6 +99,87 @@ async def get_status(process_id: str):
     if not result:
         return JSONResponse(status_code=404, content={"error": "Process ID not found"})
     return result
+
+
+@app.get("/platforms")
+async def list_platforms():
+    return {"platforms": SUPPORTED_PLATFORMS}
+
+
+@app.get("/accounts")
+async def list_accounts(platform: str | None = None):
+    if platform and platform not in SUPPORTED_PLATFORMS:
+        return JSONResponse(status_code=400, content={"error": "Unsupported platform"})
+    return {"accounts": account_store.list_accounts(platform)}
+
+
+@app.post("/accounts")
+async def create_account(payload: AccountCreate):
+    platform = payload.platform.lower().strip()
+    if platform not in SUPPORTED_PLATFORMS:
+        return JSONResponse(status_code=400, content={"error": "Unsupported platform"})
+
+    account = account_store.create_account({
+        "platform": platform,
+        "account_name": payload.account_name.strip(),
+        "auth_mode": payload.auth_mode.strip() or "manual",
+        "notes": payload.notes.strip(),
+        "created_at": datetime.now(UTC).isoformat(),
+    })
+    return {"account": account}
+
+
+@app.delete("/accounts/{account_id}")
+async def delete_account(account_id: str):
+    ok = account_store.delete_account(account_id)
+    if not ok:
+        return JSONResponse(status_code=404, content={"error": "Account not found"})
+    return {"status": "deleted"}
+
+
+@app.get("/publish/history")
+async def publish_history():
+    return {"history": publish_history_store.list()}
+
+
+@app.post("/publish")
+async def publish_to_social(payload: PublishRequest):
+    platform = payload.platform.lower().strip()
+    if platform not in SUPPORTED_PLATFORMS:
+        return JSONResponse(status_code=400, content={"error": "Unsupported platform"})
+
+    account = account_store.get_account(payload.account_id)
+    if not account:
+        return JSONResponse(status_code=404, content={"error": "Account not found"})
+
+    if account.get("platform") != platform:
+        return JSONResponse(status_code=400, content={"error": "Account/platform mismatch"})
+
+    clip_path = os.path.join(CLIPS_DIR, payload.clip_filename)
+    if not os.path.exists(clip_path):
+        return JSONResponse(status_code=404, content={"error": "Clip not found"})
+
+    result = publish_clip(
+        platform=platform,
+        account=account,
+        video_path=clip_path,
+        title=payload.title.strip(),
+        description=payload.description.strip(),
+    )
+
+    row = {
+        "platform": platform,
+        "account_id": account["id"],
+        "account_name": account.get("account_name"),
+        "clip_filename": payload.clip_filename,
+        "title": payload.title.strip(),
+        "description": payload.description.strip(),
+        "result": result,
+        "created_at": datetime.now(UTC).isoformat(),
+    }
+    publish_history_store.append(row)
+
+    return {"publish": row}
 
 def get_ai_commentary(line: str) -> str:
     """Provides a human-like strategist thought based on live transcript lines."""

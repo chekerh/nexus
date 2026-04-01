@@ -37,6 +37,23 @@
                 <button class="btn btn-primary" id="process-btn" disabled>Start Analysis</button>
             </section>
 
+            <!-- Accounts Section -->
+            <section class="card accounts-section">
+                <h3>Account Groups</h3>
+                <p class="accounts-subtitle">Add as many destination accounts as you want and select one per clip.</p>
+                <div class="account-form-grid">
+                    <select id="account-platform">
+                        <option value="tiktok">TikTok</option>
+                        <option value="instagram">Instagram</option>
+                        <option value="youtube">YouTube</option>
+                    </select>
+                    <input id="account-name" type="text" placeholder="Account name (e.g. @mybrand_main)">
+                    <input id="account-notes" type="text" placeholder="Notes (optional)">
+                    <button class="btn btn-secondary" id="add-account-btn">Add Account</button>
+                </div>
+                <div id="accounts-list" class="accounts-list"></div>
+            </section>
+
             <!-- Status Section -->
             <section id="status-section" class="status-section hidden">
                 <div class="thinking-header">
@@ -67,6 +84,7 @@
 
                 <!-- Video Clips Section -->
                 <div id="clips-container" class="clips-grid"></div>
+                <div id="publish-console" class="publish-console"></div>
             </section>
         </main>
     </div>

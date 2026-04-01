@@ -10,9 +10,16 @@ const analysisContent = document.getElementById('analysis-content');
 const stopBtn = document.getElementById('stop-btn');
 const thinkingConsole = document.getElementById('thinking-console');
 const statusTitle = document.getElementById('status-title');
+const addAccountBtn = document.getElementById('add-account-btn');
+const accountPlatform = document.getElementById('account-platform');
+const accountName = document.getElementById('account-name');
+const accountNotes = document.getElementById('account-notes');
+const accountsList = document.getElementById('accounts-list');
+const publishConsole = document.getElementById('publish-console');
 
 let selectedFile = null;
 let currentProcessId = null;
+let accountsCache = [];
 
 // Handle File Selection
 dropzone.onclick = () => fileInput.click();
@@ -110,6 +117,136 @@ async function pollStatus(processId) {
 
 const clipsContainer = document.getElementById('clips-container');
 
+async function loadAccounts() {
+    try {
+        const res = await fetch('/accounts');
+        const data = await res.json();
+        accountsCache = data.accounts || [];
+        renderAccountsList();
+    } catch (err) {
+        console.error('Failed to load accounts', err);
+    }
+}
+
+function renderAccountsList() {
+    if (!accountsCache.length) {
+        accountsList.innerHTML = '<p class="account-empty">No accounts added yet.</p>';
+        return;
+    }
+
+    accountsList.innerHTML = accountsCache.map(acc => `
+        <div class="account-row">
+            <div>
+                <strong>${acc.account_name}</strong>
+                <span class="account-tag">${acc.platform}</span>
+            </div>
+            <button class="btn btn-danger account-delete-btn" data-account-id="${acc.id}">Delete</button>
+        </div>
+    `).join('');
+
+    document.querySelectorAll('.account-delete-btn').forEach(btn => {
+        btn.onclick = async () => {
+            const id = btn.getAttribute('data-account-id');
+            await fetch(`/accounts/${id}`, { method: 'DELETE' });
+            await loadAccounts();
+        };
+    });
+}
+
+addAccountBtn.onclick = async () => {
+    const platform = accountPlatform.value;
+    const name = accountName.value.trim();
+    const notes = accountNotes.value.trim();
+
+    if (!name) return;
+
+    try {
+        await fetch('/accounts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                platform,
+                account_name: name,
+                notes,
+                auth_mode: 'manual'
+            })
+        });
+
+        accountName.value = '';
+        accountNotes.value = '';
+        await loadAccounts();
+    } catch (err) {
+        console.error('Failed to add account', err);
+    }
+};
+
+function accountOptionsForPlatform(platform) {
+    const filtered = accountsCache.filter(a => a.platform === platform);
+    if (!filtered.length) return '<option value="">No account</option>';
+    return filtered.map(a => `<option value="${a.id}">${a.account_name}</option>`).join('');
+}
+
+async function publishClip(index) {
+    const platformEl = document.getElementById(`platform-${index}`);
+    const accountEl = document.getElementById(`account-${index}`);
+    const titleEl = document.getElementById(`title-${index}`);
+    const descEl = document.getElementById(`desc-${index}`);
+    const clip = document.getElementById(`clip-${index}`)?.getAttribute('data-filename');
+
+    if (!clip) return;
+
+    const payload = {
+        platform: platformEl.value,
+        account_id: accountEl.value,
+        clip_filename: clip,
+        title: titleEl.value.trim(),
+        description: descEl.value.trim()
+    };
+
+    if (!payload.account_id) {
+        publishConsole.innerHTML = '<div class="publish-line error">Select an account for this platform first.</div>';
+        return;
+    }
+
+    try {
+        const res = await fetch('/publish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+            publishConsole.innerHTML = `<div class="publish-line error">Publish failed: ${data.error || 'Unknown error'}</div>`;
+            return;
+        }
+
+        const result = data.publish.result;
+        publishConsole.innerHTML = `
+            <div class="publish-line">
+                Ready for ${payload.platform} using account ${data.publish.account_name}. 
+                <a href="${result.upload_url}" target="_blank" rel="noopener">Open upload page</a>
+            </div>
+        `;
+    } catch (err) {
+        publishConsole.innerHTML = `<div class="publish-line error">Publish failed: ${err}</div>`;
+    }
+}
+
+function bindClipPublishActions() {
+    document.querySelectorAll('.platform-select').forEach(select => {
+        select.onchange = () => {
+            const idx = select.getAttribute('data-index');
+            const accountSelect = document.getElementById(`account-${idx}`);
+            accountSelect.innerHTML = accountOptionsForPlatform(select.value);
+        };
+    });
+
+    document.querySelectorAll('.publish-btn').forEach(btn => {
+        btn.onclick = () => publishClip(btn.getAttribute('data-index'));
+    });
+}
+
 function showResults(data) {
     statusSection.classList.add('hidden');
     resultsSection.classList.remove('hidden');
@@ -134,20 +271,34 @@ function showResults(data) {
         clipsContainer.innerHTML = data.clips.map((clip, index) => {
             const hook = data.analysis.hooks[index] || { hook_name: `Clip ${index+1}`, caption: '' };
             const encodedClip = encodeURIComponent(clip);
+            const defaultTitle = hook.hook_name || `Clip ${index + 1}`;
+            const defaultDesc = hook.caption || '';
             return `
-                <div class="card clip-card">
+                <div class="card clip-card" id="clip-${index}" data-filename="${clip}">
                     <h4>${hook.hook_name}</h4>
                     <video controls width="100%" src="/video_clips/${encodedClip}"></video>
                     <div class="clip-info">
                         <p>${hook.caption}</p>
                         <a href="/video_clips/${encodedClip}" download class="btn btn-secondary">Download Clip</a>
+                        <input id="title-${index}" class="publish-input" value="${defaultTitle.replaceAll('"', '&quot;')}">
+                        <textarea id="desc-${index}" class="publish-textarea">${defaultDesc}</textarea>
+                        <select id="platform-${index}" class="publish-select platform-select" data-index="${index}">
+                            <option value="tiktok">TikTok</option>
+                            <option value="instagram">Instagram</option>
+                            <option value="youtube">YouTube</option>
+                        </select>
+                        <select id="account-${index}" class="publish-select">${accountOptionsForPlatform('tiktok')}</select>
+                        <button class="btn btn-primary publish-btn" data-index="${index}">Post via Selected Account</button>
                     </div>
                 </div>
             `;
         }).join('');
+        bindClipPublishActions();
     } else {
         clipsContainer.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: var(--text-dim);">No clips were generated for this video.</p>';
     }
 
     processBtn.disabled = false;
 }
+
+loadAccounts();
