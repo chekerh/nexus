@@ -12,6 +12,13 @@ SUBTITLE_PRESETS = {
     "clean_minimal": "Alignment=2,FontName=Arial,FontSize=14,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BackColour=&H50000000,Bold=0,Outline=1,Shadow=0,MarginV=24",
 }
 
+FORMAT_PRESET_FILTERS = {
+    "source": [],
+    "vertical_9_16": ["scale=1080:1920:force_original_aspect_ratio=increase", "crop=1080:1920"],
+    "square_1_1": ["scale=1080:1080:force_original_aspect_ratio=increase", "crop=1080:1080"],
+    "portrait_4_5": ["scale=1080:1350:force_original_aspect_ratio=increase", "crop=1080:1350"],
+}
+
 def sanitize_filename(filename: str) -> str:
     """Removes special characters and spaces from filenames."""
     # Remove file extension first
@@ -55,6 +62,16 @@ def _seconds_to_srt(seconds: float) -> str:
     ms = total_ms % 1000
     return f"{h:02}:{m:02}:{s:02},{ms:03}"
 
+def _seconds_to_ass(seconds: float) -> str:
+    centis = int(round(max(0.0, seconds) * 100))
+    h = centis // 360000
+    centis %= 360000
+    m = centis // 6000
+    centis %= 6000
+    s = centis // 100
+    cs = centis % 100
+    return f"{h}:{m:02}:{s:02}.{cs:02}"
+
 def _escape_filter_path(path: str) -> str:
     # ffmpeg filter parser escaping
     return path.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
@@ -67,6 +84,20 @@ def _split_caption_words(text: str, max_words: int) -> List[str]:
     for i in range(0, len(words), max_words):
         chunks.append(" ".join(words[i:i + max_words]))
     return chunks
+
+def _highlight_caption_words(text: str, highlight_words: set[str]) -> str:
+    if not highlight_words:
+        return text
+
+    tokens = text.split()
+    styled_tokens = []
+    for token in tokens:
+        normalized = re.sub(r"[^a-zA-Z0-9]", "", token).lower()
+        if normalized in highlight_words:
+            styled_tokens.append(r"{\c&H00A5FF&\b1\fs58}" + token + r"{\r}")
+        else:
+            styled_tokens.append(token)
+    return " ".join(styled_tokens)
 
 def _parse_transcript_segments(transcript: Optional[str]) -> List[Dict]:
     if not transcript:
@@ -120,6 +151,63 @@ def _write_clip_srt(srt_path: str, segments: List[Dict], clip_start: float, clip
         f.write("\n".join(lines).strip() + "\n")
     return True
 
+def _write_clip_ass(ass_path: str, segments: List[Dict], clip_start: float, clip_end: float, max_words: int, highlight_words: set[str], font_size: int) -> bool:
+    clip_entries: List[Dict] = []
+    for seg in segments:
+        overlap_start = max(clip_start, seg["start"])
+        overlap_end = min(clip_end, seg["end"])
+        if overlap_end <= overlap_start:
+            continue
+
+        relative_start = overlap_start - clip_start
+        relative_end = overlap_end - clip_start
+        words_chunks = _split_caption_words(seg["text"], max_words)
+        chunk_duration = max(0.30, (relative_end - relative_start) / max(1, len(words_chunks)))
+
+        for idx, chunk in enumerate(words_chunks):
+            chunk_start = relative_start + idx * chunk_duration
+            chunk_end = min(relative_end, chunk_start + chunk_duration)
+            if chunk_end > chunk_start:
+                clip_entries.append({
+                    "start": chunk_start,
+                    "end": chunk_end,
+                    "text": _highlight_caption_words(chunk, highlight_words),
+                })
+
+    if not clip_entries:
+        return False
+
+    ass_lines = [
+        "[Script Info]",
+        "Title: Nexus UGC Captions",
+        "ScriptType: v4.00+",
+        "WrapStyle: 2",
+        "ScaledBorderAndShadow: yes",
+        "PlayResX: 1080",
+        "PlayResY: 1920",
+        "",
+        "[V4+ Styles]",
+        "Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,"
+        "ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding",
+        f"Style: Caption,Arial,{font_size},&H00FFFFFF,&H0000FFFF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,2,0,2,40,40,56,1",
+        "",
+        "[Events]",
+        "Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text",
+    ]
+
+    for entry in clip_entries:
+        ass_lines.append(
+            f"Dialogue: 0,{_seconds_to_ass(entry['start'])},{_seconds_to_ass(entry['end'])},Caption,,0,0,0,,{entry['text']}"
+        )
+
+    with open(ass_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(ass_lines) + "\n")
+    return True
+
+def _get_format_preset_filters() -> List[str]:
+    preset = (settings.CLIP_FORMAT_PRESET or "source").strip().lower()
+    return list(FORMAT_PRESET_FILTERS.get(preset, FORMAT_PRESET_FILTERS["source"]))
+
 def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active_pids: dict = None, thought_callback=None, transcript: Optional[str] = None) -> List[str]:
     """Cuts a video into clips with PID tracking and live streaming."""
     output_clips = []
@@ -132,6 +220,12 @@ def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active
     max_len = settings.CLIP_MAX_SECONDS
     padding = settings.CLIP_PADDING_SECONDS
     transcript_segments = _parse_transcript_segments(transcript)
+    highlight_words = {
+        w.strip().lower()
+        for w in (settings.CLIP_CAPTION_HIGHLIGHT_WORDS or "").split(",")
+        if w.strip()
+    }
+    preset_filters = _get_format_preset_filters()
 
     for i, hook in enumerate(hooks):
 
@@ -175,14 +269,15 @@ def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active
             
         output_name = f"{clean_base_name}_hook_{i+1}.mp4"
         output_path = os.path.join(clips_dir, output_name)
-        subtitle_path = os.path.join(clips_dir, f"{clean_base_name}_hook_{i+1}.srt")
+        subtitle_ext = "ass" if settings.CLIP_ENABLE_ANIMATED_CAPTIONS else "srt"
+        subtitle_path = os.path.join(clips_dir, f"{clean_base_name}_hook_{i+1}.{subtitle_ext}")
         
         if thought_callback:
             thought_callback(process_id, f"FFmpeg: Surgically extracting clip {i+1} ({start:.2f}s to {end:.2f}s | {duration:.2f}s)...")
         
         try:
             cmd = ["ffmpeg", "-y", "-ss", str(start), "-i", video_path, "-t", str(duration)]
-            vf_parts = []
+            vf_parts = list(preset_filters)
             af_parts = []
 
             if settings.CLIP_ENABLE_TRANSITIONS:
@@ -197,25 +292,43 @@ def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active
                     f"afade=t=out:st={fade_out_start}:d={fade_len}",
                 ])
 
-                if settings.CLIP_ENABLE_SUBTLE_ZOOM:
-                    zoom_max = max(1.0, settings.CLIP_ZOOM_MAX)
-                    vf_parts.append(
-                        f"scale=iw*{zoom_max}:ih*{zoom_max},crop=iw/{zoom_max}:ih/{zoom_max}"
-                    )
+            if settings.CLIP_ENABLE_SUBTLE_ZOOM:
+                zoom_max = max(1.0, settings.CLIP_ZOOM_MAX)
+                vf_parts.append(
+                    f"scale=iw*{zoom_max}:ih*{zoom_max},crop=iw/{zoom_max}:ih/{zoom_max}"
+                )
 
             if settings.CLIP_ENABLE_SUBTITLES and transcript_segments:
-                if _write_clip_srt(
-                    subtitle_path,
-                    transcript_segments,
-                    clip_start=start,
-                    clip_end=end,
-                    max_words=max(3, settings.CLIP_SUBTITLE_MAX_WORDS),
-                ):
+                subtitle_written = False
+                if settings.CLIP_ENABLE_ANIMATED_CAPTIONS:
+                    subtitle_written = _write_clip_ass(
+                        subtitle_path,
+                        transcript_segments,
+                        clip_start=start,
+                        clip_end=end,
+                        max_words=max(3, settings.CLIP_SUBTITLE_MAX_WORDS),
+                        highlight_words=highlight_words,
+                        font_size=max(26, settings.CLIP_CAPTION_FONT_SIZE),
+                    )
+                else:
+                    subtitle_written = _write_clip_srt(
+                        subtitle_path,
+                        transcript_segments,
+                        clip_start=start,
+                        clip_end=end,
+                        max_words=max(3, settings.CLIP_SUBTITLE_MAX_WORDS),
+                    )
+
+                if subtitle_written:
                     preset = SUBTITLE_PRESETS.get(settings.CLIP_SUBTITLE_PRESET, SUBTITLE_PRESETS["bold_center"])
                     escaped_sub_path = _escape_filter_path(subtitle_path)
-                    vf_parts.append(f"subtitles='{escaped_sub_path}':force_style='{preset}'")
+                    if settings.CLIP_ENABLE_ANIMATED_CAPTIONS:
+                        vf_parts.append(f"subtitles='{escaped_sub_path}'")
+                    else:
+                        vf_parts.append(f"subtitles='{escaped_sub_path}':force_style='{preset}'")
                     if thought_callback:
-                        thought_callback(process_id, f"Caption Engine: Burn-in subtitles enabled for clip {i+1} ({settings.CLIP_SUBTITLE_PRESET}).")
+                        mode = "animated" if settings.CLIP_ENABLE_ANIMATED_CAPTIONS else "static"
+                        thought_callback(process_id, f"Caption Engine: Burn-in subtitles enabled for clip {i+1} ({mode} / {settings.CLIP_SUBTITLE_PRESET}).")
 
             if vf_parts:
                 cmd.extend(["-vf", ",".join(vf_parts)])
