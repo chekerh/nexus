@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     OLLAMA_MODEL: str = "qwen2.5:32b"
     UPLOAD_DIR: str = str(BASE_DIR / "backend" / "data")
     FRONTEND_DIR: str = str(BASE_DIR / "frontend")
+    CLIP_MIN_SECONDS: float = 12.0
+    CLIP_MAX_SECONDS: float = 45.0
+    CLIP_PADDING_SECONDS: float = 1.5
 
     class Config:
         env_file = str(BASE_DIR / ".env")

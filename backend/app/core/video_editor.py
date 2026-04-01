@@ -12,6 +12,27 @@ def sanitize_filename(filename: str) -> str:
     clean_name = re.sub(r'[^\w\-]', '_', name)
     return clean_name
 
+def get_video_duration(video_path: str) -> float:
+    """Returns media duration in seconds using ffprobe."""
+    try:
+        cmd = [
+            "ffprobe",
+            "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            video_path,
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        return float(result.stdout.strip())
+    except Exception:
+        return 0.0
+
+def _safe_float(value, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
 def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active_pids: dict = None, thought_callback=None) -> List[str]:
     """Cuts a video into clips with PID tracking and live streaming."""
     output_clips = []
@@ -19,18 +40,56 @@ def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active
     clean_base_name = sanitize_filename(raw_base_name)
     clips_dir = os.path.join(settings.UPLOAD_DIR, "clips")
     os.makedirs(clips_dir, exist_ok=True)
+    video_duration = get_video_duration(video_path)
+    min_len = settings.CLIP_MIN_SECONDS
+    max_len = settings.CLIP_MAX_SECONDS
+    padding = settings.CLIP_PADDING_SECONDS
 
     for i, hook in enumerate(hooks):
 
-        start, end = hook.get('start', 0), hook.get('end', 0)
+        start = _safe_float(hook.get('start', 0.0), 0.0)
+        end = _safe_float(hook.get('end', 0.0), 0.0)
+        if end < start:
+            start, end = end, start
+
+        # Add context padding.
+        start = max(0.0, start - padding)
+        end = end + padding
+
+        # Enforce minimum length.
         duration = end - start
-        if duration <= 0: continue
+        if duration < min_len:
+            end = start + min_len
+            duration = min_len
+
+        # Enforce maximum length.
+        if duration > max_len:
+            midpoint = (start + end) / 2
+            start = midpoint - (max_len / 2)
+            end = midpoint + (max_len / 2)
+
+        # Clamp to media duration.
+        if video_duration > 0:
+            start = max(0.0, min(start, video_duration))
+            end = max(0.0, min(end, video_duration))
+
+            # Re-enforce min length after clamp if possible.
+            duration = end - start
+            if duration < min_len:
+                if start + min_len <= video_duration:
+                    end = start + min_len
+                elif end - min_len >= 0:
+                    start = end - min_len
+
+        duration = end - start
+        if duration <= 0:
+            continue
             
         output_name = f"{clean_base_name}_hook_{i+1}.mp4"
         output_path = os.path.join(clips_dir, output_name)
         
         if thought_callback:
-            thought_callback(process_id, f"FFmpeg: Surgically extracting clip {i+1} ({start}s to {end}s)...")
+            thought_callback(process_id, f"FFmpeg: Surgically extracting clip {i+1} ({start:.2f}s to {end:.2f}s | {duration:.2f}s)...")
         
         try:
             cmd = ["ffmpeg", "-y", "-ss", str(start), "-i", video_path, "-t", str(duration), "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-c:a", "aac", "-b:a", "128k", output_path]
