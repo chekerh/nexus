@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     WHISPER_BINARY_PATH: str = "/usr/local/bin/whisper-main"
     WHISPER_MODEL_PATH: str = "/usr/local/share/whisper/models/ggml-base.en.bin"
     OLLAMA_MODEL: str = "qwen2.5:32b"
+    OLLAMA_ANALYST_MODEL: str = ""
+    OLLAMA_STYLE_MODEL: str = "qwen2.5:3b"
     UPLOAD_DIR: str = str(BASE_DIR / "backend" / "data")
     FRONTEND_DIR: str = str(BASE_DIR / "frontend")
     ACCOUNTS_DB_PATH: str = str(BASE_DIR / "backend" / "data" / "accounts.json")
@@ -36,6 +38,8 @@ class Settings(BaseSettings):
     PROCESSING_PROFILE: str = "balanced"  # eco | balanced | quality
     VIDEO_ENCODER: str = "auto"  # auto | h264_videotoolbox | libx264
     VIDEO_THREADS: int = 2
+    CAPTION_STYLE_MODE: str = "hybrid"  # rule | ai | hybrid
+    CAPTION_STYLE_AI_MAX_CUES: int = 60
     STRATEGIST_PROMPT_FILE: str = str(BASE_DIR / "prompts" / "strategist_system.md")
     VIRAL_SIGNALS_FILE: str = str(BASE_DIR / "prompts" / "viral_signals.md")
     CLIP_MIN_SECONDS: float = 12.0

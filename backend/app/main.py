@@ -293,6 +293,17 @@ def run_pipeline_sync(process_id: str, video_path: str):
             processing_results[process_id].update({"status": "error", "error": "AI Analysis failed to find hooks."})
             return
 
+        meta = analysis.get("analysis_meta", {})
+        if meta:
+            add_thought(
+                process_id,
+                f"Selection Engine: {meta.get('candidate_count', 0)} candidates ranked, {meta.get('scene_cut_count', 0)} scene boundaries used, model={meta.get('model', 'n/a')}."
+            )
+            add_thought(
+                process_id,
+                f"Duration Optimizer: min={meta.get('duration_min', 0)}s avg={meta.get('duration_avg', 0)}s max={meta.get('duration_max', 0)}s."
+            )
+
         # Step 3: Video Cutting
         check_cancelled()
         if "strategy_thought" in analysis:

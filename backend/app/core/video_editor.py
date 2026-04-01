@@ -2,6 +2,7 @@ import os
 import subprocess
 import re
 import json
+import ollama
 from typing import List, Dict, Optional
 from .config import settings
 
@@ -34,6 +35,8 @@ STYLE_KEYWORDS = {
     "warning": {"warning", "danger", "scam", "failed", "mistake", "risk", "crash"},
     "hype": {"crazy", "insane", "viral", "best", "huge", "ultimate", "secret"},
 }
+
+STYLE_IDS = ["neutral", "impact", "question", "money", "warning", "hype"]
 
 _FFMPEG_FILTER_CACHE: Optional[set[str]] = None
 
@@ -140,6 +143,48 @@ def _choose_caption_style(text: str) -> str:
     if "!" in text:
         return "impact"
     return "neutral"
+
+def _choose_style_model() -> str:
+    model = (settings.OLLAMA_STYLE_MODEL or settings.OLLAMA_ANALYST_MODEL or settings.OLLAMA_MODEL).strip()
+    if settings.PROCESSING_PROFILE == "eco" and not settings.OLLAMA_STYLE_MODEL:
+        return "qwen2.5:3b"
+    return model
+
+def _infer_caption_styles_with_ai(texts: List[str]) -> List[str]:
+    if not texts:
+        return []
+
+    style_model = _choose_style_model()
+    system = (
+        "You are a short-video subtitle style classifier. "
+        "For each input caption text, output one style from this set only: "
+        "neutral, impact, question, money, warning, hype. "
+        "Output strict JSON only in this format: {\"styles\": [\"style1\", \"style2\", ...]}."
+    )
+    payload_lines = [f"{i+1}. {t}" for i, t in enumerate(texts)]
+    user = "Caption lines:\n" + "\n".join(payload_lines)
+
+    try:
+        response = ollama.chat(
+            model=style_model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+        )
+        content = (response.get("message", {}) or {}).get("content", "").strip()
+        match = re.search(r"\{[\s\S]*\}", content)
+        if not match:
+            return []
+        parsed = json.loads(match.group(0))
+        styles = parsed.get("styles", []) if isinstance(parsed, dict) else []
+        clean_styles = []
+        for s in styles:
+            v = str(s).strip().lower()
+            clean_styles.append(v if v in STYLE_IDS else "neutral")
+        return clean_styles
+    except Exception:
+        return []
 
 def _parse_transcript_segments(transcript: Optional[str]) -> List[Dict]:
     if not transcript:
@@ -399,7 +444,7 @@ def _write_clip_vtt(vtt_path: str, segments: List[Dict], clip_start: float, clip
         f.write("\n".join(lines).strip() + "\n")
     return True
 
-def _write_clip_cues_json(cues_path: str, segments: List[Dict], clip_start: float, clip_end: float, max_words: int) -> bool:
+def _write_clip_cues_json(cues_path: str, segments: List[Dict], clip_start: float, clip_end: float, max_words: int, process_id: Optional[str] = None, thought_callback=None, clip_index: int = 0) -> bool:
     cues: List[Dict] = []
     for seg in segments:
         overlap_start = max(clip_start, seg["start"])
@@ -425,6 +470,22 @@ def _write_clip_cues_json(cues_path: str, segments: List[Dict], clip_start: floa
 
     if not cues:
         return False
+
+    mode = (settings.CAPTION_STYLE_MODE or "hybrid").strip().lower()
+    ai_limit = max(0, settings.CAPTION_STYLE_AI_MAX_CUES)
+    if mode in {"ai", "hybrid"} and ai_limit > 0:
+        ai_indexes = [
+            idx for idx, cue in enumerate(cues)
+            if mode == "ai" or cue.get("style") == "neutral"
+        ][:ai_limit]
+        ai_texts = [cues[idx]["text"] for idx in ai_indexes]
+        ai_styles = _infer_caption_styles_with_ai(ai_texts)
+        if ai_styles:
+            for idx, style in zip(ai_indexes, ai_styles):
+                if style in STYLE_IDS:
+                    cues[idx]["style"] = style
+            if thought_callback:
+                thought_callback(process_id, f"Caption Engine: AI style pass applied on clip {clip_index} ({len(ai_styles)} cues, mode={mode}, model={_choose_style_model()}).")
 
     payload = {
         "styles": CAPTION_STYLES,
@@ -513,6 +574,9 @@ def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active
                     clip_start=start,
                     clip_end=end,
                     max_words=max(3, settings.CLIP_SUBTITLE_MAX_WORDS),
+                    process_id=process_id,
+                    thought_callback=thought_callback,
+                    clip_index=i + 1,
                 )
                 if thought_callback and not can_burn_subtitles:
                     thought_callback(process_id, f"Caption Engine: ffmpeg lacks 'subtitles' filter; using soft subtitle track fallback for clip {i+1}.")

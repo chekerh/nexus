@@ -406,6 +406,10 @@ def analyze_transcript(transcript: str, video_path: Optional[str] = None) -> Opt
         system_prompt += "\n\n--- VIRAL SIGNALS RUBRIC ---\n" + viral_signals_prompt
 
     try:
+        analyst_model = (settings.OLLAMA_ANALYST_MODEL or settings.OLLAMA_MODEL).strip()
+        if settings.PROCESSING_PROFILE == "eco" and not settings.OLLAMA_ANALYST_MODEL:
+            analyst_model = "qwen2.5:7b"
+
         segments = _parse_segments(transcript)
         cleaned_transcript = "\n".join(
             [f"[{s['start']:.2f} --> {s['end']:.2f}] {s['text']}" for s in segments]
@@ -414,7 +418,7 @@ def analyze_transcript(transcript: str, video_path: Optional[str] = None) -> Opt
             cleaned_transcript = transcript
         total_duration = _video_duration_from_path(video_path)
         scene_cuts = []
-        if settings.ANALYSIS_ENABLE_SCENE_DETECTION and settings.PROCESSING_PROFILE in {"balanced", "quality"}:
+        if settings.ANALYSIS_ENABLE_SCENE_DETECTION and settings.PROCESSING_PROFILE == "quality":
             scene_cuts = _detect_scene_cuts(video_path)
         candidates = _build_candidates(segments, scene_cuts, total_duration)
         candidate_summary = _candidate_windows_summary_v3(candidates, scene_cuts)
@@ -426,7 +430,7 @@ def analyze_transcript(transcript: str, video_path: Optional[str] = None) -> Opt
             user_payload = f"{candidate_summary}\n\nTranscript:\n{user_payload}"
 
         response = ollama.chat(
-            model=settings.OLLAMA_MODEL,
+            model=analyst_model,
             messages=[
                 {'role': 'system', 'content': system_prompt},
                 {'role': 'user', 'content': user_payload},
@@ -449,6 +453,16 @@ def analyze_transcript(transcript: str, video_path: Optional[str] = None) -> Opt
             hooks = _snap_hooks_to_candidates(hooks, candidates)
             data['hooks'] = _normalize_hooks(hooks)
             data['strategy_thought'] = strategy
+            durations = [round(h['end'] - h['start'], 2) for h in data['hooks']]
+            data['analysis_meta'] = {
+                'model': analyst_model,
+                'candidate_count': len(candidates),
+                'scene_cut_count': len(scene_cuts),
+                'durations': durations,
+                'duration_min': min(durations) if durations else 0,
+                'duration_max': max(durations) if durations else 0,
+                'duration_avg': round(sum(durations) / len(durations), 2) if durations else 0,
+            }
             return data
 
         return None
