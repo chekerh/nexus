@@ -46,6 +46,9 @@ class AccountCreate(BaseModel):
     youtube_privacy_status: str = "private"
     instagram_user_id: str = ""
     instagram_access_token: str = ""
+    tiktok_open_id: str = ""
+    tiktok_refresh_token: str = ""
+    tiktok_access_token: str = ""
 
 
 class PublishRequest(BaseModel):
@@ -60,10 +63,16 @@ def _sanitize_account(account: dict) -> dict:
     copy = dict(account)
     token = copy.get("oauth_refresh_token", "")
     instagram_token = copy.get("instagram_access_token", "")
+    tiktok_refresh = copy.get("tiktok_refresh_token", "")
+    tiktok_access = copy.get("tiktok_access_token", "")
     copy["has_oauth_refresh_token"] = bool(token)
     copy["has_instagram_access_token"] = bool(instagram_token)
+    copy["has_tiktok_refresh_token"] = bool(tiktok_refresh)
+    copy["has_tiktok_access_token"] = bool(tiktok_access)
     copy.pop("oauth_refresh_token", None)
     copy.pop("instagram_access_token", None)
+    copy.pop("tiktok_refresh_token", None)
+    copy.pop("tiktok_access_token", None)
     return copy
 
 @app.post("/process")
@@ -144,6 +153,9 @@ async def create_account(payload: AccountCreate):
         "youtube_privacy_status": payload.youtube_privacy_status.strip() or "private",
         "instagram_user_id": payload.instagram_user_id.strip(),
         "instagram_access_token": payload.instagram_access_token.strip(),
+        "tiktok_open_id": payload.tiktok_open_id.strip(),
+        "tiktok_refresh_token": payload.tiktok_refresh_token.strip(),
+        "tiktok_access_token": payload.tiktok_access_token.strip(),
         "created_at": datetime.now(UTC).isoformat(),
     })
     return {"account": _sanitize_account(account)}

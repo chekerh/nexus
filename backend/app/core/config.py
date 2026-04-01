@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     YOUTUBE_CLIENT_SECRET: str = ""
     PUBLIC_BASE_URL: str = ""
     INSTAGRAM_GRAPH_VERSION: str = "v22.0"
+    TIKTOK_CLIENT_KEY: str = ""
+    TIKTOK_CLIENT_SECRET: str = ""
+    TIKTOK_API_BASE: str = "https://open.tiktokapis.com"
     STRATEGIST_PROMPT_FILE: str = str(BASE_DIR / "prompts" / "strategist_system.md")
     VIRAL_SIGNALS_FILE: str = str(BASE_DIR / "prompts" / "viral_signals.md")
     CLIP_MIN_SECONDS: float = 12.0

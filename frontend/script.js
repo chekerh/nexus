@@ -18,6 +18,9 @@ const accountRefreshToken = document.getElementById('account-refresh-token');
 const accountYoutubePrivacy = document.getElementById('account-youtube-privacy');
 const accountInstagramUserId = document.getElementById('account-instagram-user-id');
 const accountInstagramToken = document.getElementById('account-instagram-token');
+const accountTikTokOpenId = document.getElementById('account-tiktok-open-id');
+const accountTikTokRefreshToken = document.getElementById('account-tiktok-refresh-token');
+const accountTikTokAccessToken = document.getElementById('account-tiktok-access-token');
 const accountsList = document.getElementById('accounts-list');
 const publishConsole = document.getElementById('publish-console');
 
@@ -145,6 +148,7 @@ function renderAccountsList() {
                 <span class="account-tag">${acc.platform}</span>
                 ${acc.has_oauth_refresh_token ? '<span class="account-tag">api-ready</span>' : ''}
                 ${acc.has_instagram_access_token ? '<span class="account-tag">ig-api-ready</span>' : ''}
+                ${acc.has_tiktok_refresh_token || acc.has_tiktok_access_token ? '<span class="account-tag">tt-api-ready</span>' : ''}
             </div>
             <button class="btn btn-danger account-delete-btn" data-account-id="${acc.id}">Delete</button>
         </div>
@@ -167,6 +171,9 @@ addAccountBtn.onclick = async () => {
     const youtubePrivacyStatus = accountYoutubePrivacy.value;
     const instagramUserId = accountInstagramUserId.value.trim();
     const instagramAccessToken = accountInstagramToken.value.trim();
+    const tiktokOpenId = accountTikTokOpenId.value.trim();
+    const tiktokRefreshToken = accountTikTokRefreshToken.value.trim();
+    const tiktokAccessToken = accountTikTokAccessToken.value.trim();
 
     if (!name) return;
 
@@ -178,11 +185,14 @@ addAccountBtn.onclick = async () => {
                 platform,
                 account_name: name,
                 notes,
-                auth_mode: refreshToken || instagramAccessToken ? 'api' : 'manual',
+                auth_mode: (refreshToken || instagramAccessToken || tiktokRefreshToken || tiktokAccessToken) ? 'api' : 'manual',
                 oauth_refresh_token: refreshToken,
                 youtube_privacy_status: youtubePrivacyStatus,
                 instagram_user_id: instagramUserId,
                 instagram_access_token: instagramAccessToken,
+                tiktok_open_id: tiktokOpenId,
+                tiktok_refresh_token: tiktokRefreshToken,
+                tiktok_access_token: tiktokAccessToken,
             })
         });
 
@@ -191,6 +201,9 @@ addAccountBtn.onclick = async () => {
         accountRefreshToken.value = '';
         accountInstagramUserId.value = '';
         accountInstagramToken.value = '';
+        accountTikTokOpenId.value = '';
+        accountTikTokRefreshToken.value = '';
+        accountTikTokAccessToken.value = '';
         await loadAccounts();
     } catch (err) {
         console.error('Failed to add account', err);
@@ -200,16 +213,25 @@ addAccountBtn.onclick = async () => {
 function updateAccountCredentialInputs() {
     const isYoutube = accountPlatform.value === 'youtube';
     const isInstagram = accountPlatform.value === 'instagram';
+    const isTikTok = accountPlatform.value === 'tiktok';
     accountRefreshToken.disabled = !isYoutube;
     accountYoutubePrivacy.disabled = !isYoutube;
     accountInstagramUserId.disabled = !isInstagram;
     accountInstagramToken.disabled = !isInstagram;
+    accountTikTokOpenId.disabled = !isTikTok;
+    accountTikTokRefreshToken.disabled = !isTikTok;
+    accountTikTokAccessToken.disabled = !isTikTok;
     if (!isYoutube) {
         accountRefreshToken.value = '';
     }
     if (!isInstagram) {
         accountInstagramUserId.value = '';
         accountInstagramToken.value = '';
+    }
+    if (!isTikTok) {
+        accountTikTokOpenId.value = '';
+        accountTikTokRefreshToken.value = '';
+        accountTikTokAccessToken.value = '';
     }
 }
 

@@ -57,6 +57,9 @@ class AccountStore:
                 "youtube_privacy_status": account.get("youtube_privacy_status", "private"),
                 "instagram_user_id": account.get("instagram_user_id", ""),
                 "instagram_access_token": account.get("instagram_access_token", ""),
+                "tiktok_open_id": account.get("tiktok_open_id", ""),
+                "tiktok_refresh_token": account.get("tiktok_refresh_token", ""),
+                "tiktok_access_token": account.get("tiktok_access_token", ""),
                 "created_at": account.get("created_at"),
             }
             data.append(new_account)

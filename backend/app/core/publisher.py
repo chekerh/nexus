@@ -78,6 +78,16 @@ def publish_clip(platform: str, account: Dict, video_path: str, title: str, desc
             })
             return instagram_result
 
+    if platform == "tiktok":
+        tiktok_result = _publish_to_tiktok(account, video_path, title, description)
+        if tiktok_result.get("status") in {"published", "submitted"}:
+            tiktok_result.update({
+                "platform": platform,
+                "account_name": account_name,
+                "created_at": datetime.now(UTC).isoformat(),
+            })
+            return tiktok_result
+
     return {
         "status": "manual_required",
         "platform": platform,
@@ -92,6 +102,111 @@ def publish_clip(platform: str, account: Dict, video_path: str, title: str, desc
         ),
         "created_at": datetime.now(UTC).isoformat(),
     }
+
+
+def _publish_to_tiktok(account: Dict, video_path: str, title: str, description: str) -> Dict:
+    api_base = settings.TIKTOK_API_BASE.strip().rstrip("/")
+    client_key = settings.TIKTOK_CLIENT_KEY.strip()
+    client_secret = settings.TIKTOK_CLIENT_SECRET.strip()
+    public_base = settings.PUBLIC_BASE_URL.strip().rstrip("/")
+
+    if not client_key or not client_secret:
+        return {
+            "status": "manual_required",
+            "reason": "Missing TIKTOK_CLIENT_KEY/TIKTOK_CLIENT_SECRET",
+            "upload_url": MANUAL_UPLOAD_URL["tiktok"],
+            "message": "Set TikTok app credentials in .env for direct publishing.",
+        }
+
+    if not public_base:
+        return {
+            "status": "manual_required",
+            "reason": "Missing PUBLIC_BASE_URL",
+            "upload_url": MANUAL_UPLOAD_URL["tiktok"],
+            "message": "Set PUBLIC_BASE_URL to a publicly reachable URL so TikTok can fetch media.",
+        }
+
+    access_token = (account.get("tiktok_access_token") or "").strip()
+    refresh_token = (account.get("tiktok_refresh_token") or "").strip()
+
+    if not access_token and refresh_token:
+        access_token = _tiktok_refresh_access_token(api_base, client_key, client_secret, refresh_token)
+
+    if not access_token:
+        return {
+            "status": "manual_required",
+            "reason": "Missing or invalid TikTok access/refresh token",
+            "upload_url": MANUAL_UPLOAD_URL["tiktok"],
+            "message": "Reconnect TikTok account to enable direct publish.",
+        }
+
+    clip_name = quote(os.path.basename(video_path))
+    video_url = f"{public_base}/video_clips/{clip_name}"
+    post_title = (title or "").strip()[:150]
+    post_desc = (description or "").strip()[:2200]
+    final_caption = (post_title + "\n\n" + post_desc).strip()[:2200]
+
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
+    body = {
+        "post_info": {
+            "title": post_title,
+            "description": final_caption,
+            "privacy_level": "SELF_ONLY",
+            "disable_duet": False,
+            "disable_comment": False,
+            "disable_stitch": False,
+        },
+        "source_info": {
+            "source": "PULL_FROM_URL",
+            "video_url": video_url,
+        },
+    }
+
+    with httpx.Client(timeout=60) as client:
+        resp = client.post(f"{api_base}/v2/post/publish/video/init/", headers=headers, json=body)
+        if resp.status_code not in (200, 201):
+            return {
+                "status": "manual_required",
+                "reason": f"TikTok publish init failed ({resp.status_code}): {resp.text}",
+                "upload_url": MANUAL_UPLOAD_URL["tiktok"],
+                "message": "Fallback to manual upload.",
+            }
+
+        data = resp.json()
+        publish_id = data.get("data", {}).get("publish_id", "") or data.get("publish_id", "")
+
+        if not publish_id:
+            return {
+                "status": "submitted",
+                "message": "TikTok init accepted but publish ID not returned. Check TikTok inbox/drafts.",
+            }
+
+        return {
+            "status": "submitted",
+            "publish_id": publish_id,
+            "message": "TikTok post submitted. Check TikTok app/account for processing completion.",
+        }
+
+
+def _tiktok_refresh_access_token(api_base: str, client_key: str, client_secret: str, refresh_token: str) -> str:
+    with httpx.Client(timeout=30) as client:
+        resp = client.post(
+            f"{api_base}/v2/oauth/token/",
+            data={
+                "client_key": client_key,
+                "client_secret": client_secret,
+                "grant_type": "refresh_token",
+                "refresh_token": refresh_token,
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        if resp.status_code != 200:
+            return ""
+        data = resp.json()
+        return data.get("access_token", "") or data.get("data", {}).get("access_token", "")
 
 
 def _publish_to_instagram(account: Dict, video_path: str, title: str, description: str) -> Dict:
