@@ -299,7 +299,7 @@ def run_pipeline_sync(process_id: str, video_path: str):
             add_thought(process_id, f"Qwen Strategic Insight: {analysis['strategy_thought']}")
             
         add_thought(process_id, f"Editor Monologue: Found {len(analysis.get('hooks', []))} viral segments. Initiating surgical cuts.")
-        clips = cut_video(video_path, analysis["hooks"], process_id, active_pids, thought_callback=add_thought)
+        clips = cut_video(video_path, analysis["hooks"], process_id, active_pids, thought_callback=add_thought, transcript=transcript)
         
         if not clips:
              if not processing_results[process_id].get("cancelled"):

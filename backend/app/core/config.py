@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     CLIP_FADE_SECONDS: float = 0.35
     CLIP_ENABLE_SUBTLE_ZOOM: bool = True
     CLIP_ZOOM_MAX: float = 1.05
+    CLIP_ENABLE_SUBTITLES: bool = True
+    CLIP_SUBTITLE_PRESET: str = "bold_center"
+    CLIP_SUBTITLE_MAX_WORDS: int = 10
     STRATEGIST_PROMPT_FILE: str = str(BASE_DIR / "prompts" / "strategist_system.md")
     VIRAL_SIGNALS_FILE: str = str(BASE_DIR / "prompts" / "viral_signals.md")
     CLIP_MIN_SECONDS: float = 12.0
