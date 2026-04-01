@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     CLIP_CAPTION_FONT_SIZE: int = 48
     CLIP_CAPTION_HIGHLIGHT_WORDS: str = "crazy,insane,secret,money,warning,never,best,worst,failed,mistake"
     CLIP_FORMAT_PRESET: str = "vertical_9_16"
+    CLIP_DURATION_DIVERSITY: float = 0.45
+    ANALYSIS_ENABLE_SCENE_DETECTION: bool = False
+    PROCESSING_PROFILE: str = "balanced"  # eco | balanced | quality
+    VIDEO_ENCODER: str = "auto"  # auto | h264_videotoolbox | libx264
+    VIDEO_THREADS: int = 2
     STRATEGIST_PROMPT_FILE: str = str(BASE_DIR / "prompts" / "strategist_system.md")
     VIRAL_SIGNALS_FILE: str = str(BASE_DIR / "prompts" / "viral_signals.md")
     CLIP_MIN_SECONDS: float = 12.0

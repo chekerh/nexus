@@ -1,36 +1,52 @@
-# PubReelo: Data Flow Pipeline
+# Nexus-UGC: Data Flow Pipeline (Current)
 
-The PubReelo system follows a strictly local, sequential pipeline for processing video content.
+## 1) Upload & job creation
+- User uploads video in dashboard.
+- Backend writes file under `backend/data/` and creates `process_id` state.
 
-## 1. Upload & Ingestion
-- User uploads an `.mp4` or `.mov` file through the Dashboard.
-- FastAPI backend saves the file to `backend/data/{uuid}_filename.ext`.
-- An entry is created in the in-memory `processing_results` store with status `processing`.
+## 2) Perception: audio + transcript
+- FFmpeg extracts 16k mono WAV.
+- Whisper.cpp transcribes with timestamps.
+- Internal runtime noise lines are filtered before analysis.
 
-## 2. Audio Extraction (FFmpeg)
-- The system extracts audio from the video file.
-- **Format:** `WAV` (PCM 16-bit, Mono, 16,000 Hz).
-- The extracted WAV file is temporarily saved in `backend/data/`.
+## 3) Hybrid strategy analysis
+- Transcript is parsed into timestamp segments.
+- Candidate windows are ranked using:
+	- semantic cues
+	- speech density
+	- optional scene-cut evidence (configurable)
+	- adaptive duration heuristics (non-uniform lengths)
+- Qwen receives:
+	- strategist playbook
+	- viral rubric
+	- candidate summary + transcript
+- Output: hooks (`start/end/caption/confidence`).
 
-## 3. Transcription (Perception Layer)
-- `whisper-cli` is called as a subprocess, passing the temporary WAV file and the local `ggml` model.
-- **Output:** A raw text transcript (timestamps suppressed with `-nt`).
-- Status is updated to "Extracting audio and transcribing...".
+## 4) Editing and enhancement
+- Clip windows are padded + clamped to valid media bounds.
+- FFmpeg renders each clip with selected profile:
+	- format preset (`9:16`, etc.)
+	- transitions
+	- subtle zoom
+	- subtitles (burn-in when available)
+- If burn-in is unavailable or fails:
+	- generate `.vtt` soft subtitles
+	- generate `.cues.json` for styled overlay in frontend
+	- retry with simplified filter stack (fallback ladder).
 
-## 4. Viral Analysis (Intelligence Layer)
-- The raw transcript is sent to the local **Ollama** server via a Chat API call.
-- **Model:** `qwen3:30b`.
-- **System Prompt:** Instructs the model to act as a viral strategist, identifying 3 hooks and writing captions.
-- Status is updated to "Analyzing transcript for viral hooks (Ollama)...".
+## 5) Delivery
+- Backend returns transcript, hooks, and clip file names.
+- Frontend renders clip players, subtitle tracks, and styled subtitle overlays.
 
-## 5. Automated Video Cutting (Phase 2)
-- The backend parses the JSON output from the Strategist Agent to extract 3 sets of timestamps.
-- **FFmpeg** is invoked for each hook to perform a "lossless cut" (using stream copying).
-- **Command:** `ffmpeg -ss {start} -to {end} -i {input} -c copy {output}`.
-- Three new video files are generated and stored in a public `clips/` directory.
+## 6) Publishing pipeline
+- User picks destination account per clip.
+- Backend attempts direct publish per platform when credentials are present:
+	- YouTube OAuth upload
+	- Instagram Graph Reels flow
+	- TikTok Open API init flow
+- Otherwise, safe manual upload fallback URL is returned.
 
-## 6. Result Delivery & Cleanup
-- The final transcript, AI analysis, and links to the 3 video clips are stored in the results.
-- Status is updated to `completed`.
-- Temporary raw audio and original upload files are managed/cleaned up.
-- The Frontend renders the 3 video players for immediate preview.
+## 7) State + persistence
+- Account store: `backend/data/accounts.json`
+- Publish history: `backend/data/publish_history.json`
+- Clips + subtitle artifacts: `backend/data/clips/`

@@ -1,34 +1,79 @@
-# PubReelo: System Architecture
+# Nexus-UGC: System Architecture (Current)
 
 ## 1. Overview
-PubReelo is a local-first AI pipeline designed to automate the creation of viral social media content (hooks, captions, and strategy) from raw UGC (User Generated Content) videos.
+Nexus-UGC is a local-first AI production system that:
+1) analyzes long-form UGC,
+2) finds viral candidate windows,
+3) generates optimized short clips,
+4) adds subtitle layers/styles,
+5) routes clips to multi-account social publishing flows.
 
 ## 2. Core Components
 
-### Frontend (UGC Dashboard)
-- **Tech Stack:** Vanilla HTML5, CSS3, JavaScript.
-- **Role:** Handles video file selection, triggers the processing pipeline via REST API, and displays real-time status and final results (transcripts and AI-generated hooks).
+### Frontend (Dashboard)
+- **Tech:** Vanilla HTML/CSS/JS.
+- **Capabilities:**
+	- upload + run pipeline
+	- live "thinking" stream
+	- clips preview/download
+	- subtitle overlay rendering from cue JSON
+	- account management (TikTok/Instagram/YouTube)
+	- publish action per selected account
 
-### Backend (FastAPI Strategy Engine)
-- **Tech Stack:** Python 3.14+, FastAPI, Uvicorn.
-- **Role:** Orchestrates the pipeline. It handles file uploads, manages background tasks for heavy processing, and provides status polling for the frontend.
+### Backend (FastAPI Orchestrator)
+- **Tech:** FastAPI + Uvicorn + Python services.
+- **Capabilities:**
+	- process lifecycle and cancellation
+	- account CRUD + publish history
+	- publish endpoints with platform connectors and safe fallback
 
 ### Perception Layer (Whisper.cpp)
-- **Model:** `ggml-base.en.bin` (running locally).
-- **Role:** Converts audio from video files into clean text transcripts. It is optimized for local CPU/GPU performance.
+- Extracts timestamped transcript lines from video audio.
+- Noise filtering removes internal runtime logs before analysis.
 
-### Intelligence Layer (Ollama / Qwen)
-- **Model:** `qwen3:30b` (running via local Ollama instance).
-- **Role:** Acts as the "Creative Director." It parses transcripts with timestamps to identify high-retention segments and generates viral strategies.
-- **Phase 3 Enhancement:** Now provides "thinking streams" to the UI to show the reasoning process.
+### Intelligence Layer (Qwen via Ollama)
+- Prompt-file driven strategist behavior (`prompts/`).
+- Hybrid candidate scoring combines:
+	- semantic viral cues,
+	- speech density,
+	- optional scene-boundary evidence,
+	- duration diversity logic (non-uniform clip lengths).
 
-### Video Editing Engine (FFmpeg)
-- **Role:** Performs precise, frame-accurate re-encoding of video segments based on AI-determined timestamps.
+### Editing Layer (FFmpeg)
+- Dynamic clip window cutting with min/max constraints.
+- Format presets (`vertical_9_16`, etc.).
+- Transitions and subtle zoom.
+- Subtitle pipeline:
+	- animated/static caption generation,
+	- soft-track fallback (`.vtt`) when burn-in filter unavailable,
+	- style cues JSON for frontend overlay rendering.
+- Multi-stage FFmpeg fallback to avoid total pipeline failure.
+
+### Publishing Layer
+- **YouTube:** direct upload (OAuth refresh token path).
+- **Instagram Reels:** Graph API path (public media URL required).
+- **TikTok:** Open API init path (token/app credentials required).
+- **Fallback:** safe manual upload URLs when API prerequisites are missing.
 
 ## 3. Storage
-- **Local Data (`backend/data/`):** Temporary storage for uploads.
-- **Clips Library (`backend/data/clips/`):** Permanent (per session) storage for generated viral reels.
+- `backend/data/`:
+	- temporary uploads/transcoding artifacts
+	- `accounts.json`
+	- `publish_history.json`
+- `backend/data/clips/`:
+	- generated `.mp4`
+	- subtitle sidecars (`.vtt`, optional `.ass/.srt`)
+	- style cue metadata (`.cues.json`)
 
-## 4. Interaction Model (Phase 3)
-- **Real-time Feedback:** Instead of static loaders, the system now provides a "Thinking Console" showing the AI's step-by-step logic.
-- **User Control:** Added "Stop Analysis" capability to immediately terminate resource-heavy AI or FFmpeg processes.
+## 4. Runtime Profiles & Optimization
+- Configurable knobs in `.env`:
+	- processing profile (`eco|balanced|quality`)
+	- optional scene detection toggle
+	- encoder selection (`auto`, videotoolbox, x264)
+	- thread limits
+	- subtitle style/animation parameters
+
+## 5. Interaction Model
+- Real-time thought stream across perception, analysis, and editing.
+- Graceful degradation approach:
+	- if advanced filters fail, progressively simplify rendering and still output clips.

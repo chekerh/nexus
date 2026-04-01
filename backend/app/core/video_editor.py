@@ -1,6 +1,7 @@
 import os
 import subprocess
 import re
+import json
 from typing import List, Dict, Optional
 from .config import settings
 
@@ -17,6 +18,21 @@ FORMAT_PRESET_FILTERS = {
     "vertical_9_16": ["scale=1080:1920:force_original_aspect_ratio=increase", "crop=1080:1920"],
     "square_1_1": ["scale=1080:1080:force_original_aspect_ratio=increase", "crop=1080:1080"],
     "portrait_4_5": ["scale=1080:1350:force_original_aspect_ratio=increase", "crop=1080:1350"],
+}
+
+CAPTION_STYLES = {
+    "neutral": {"className": "cap-neutral"},
+    "impact": {"className": "cap-impact"},
+    "question": {"className": "cap-question"},
+    "money": {"className": "cap-money"},
+    "warning": {"className": "cap-warning"},
+    "hype": {"className": "cap-hype"},
+}
+
+STYLE_KEYWORDS = {
+    "money": {"money", "million", "rich", "price", "cash", "profit", "sell"},
+    "warning": {"warning", "danger", "scam", "failed", "mistake", "risk", "crash"},
+    "hype": {"crazy", "insane", "viral", "best", "huge", "ultimate", "secret"},
 }
 
 _FFMPEG_FILTER_CACHE: Optional[set[str]] = None
@@ -110,6 +126,20 @@ def _highlight_caption_words(text: str, highlight_words: set[str]) -> str:
         else:
             styled_tokens.append(token)
     return " ".join(styled_tokens)
+
+def _choose_caption_style(text: str) -> str:
+    lowered = text.lower()
+    if "?" in text or lowered.startswith("why") or lowered.startswith("how"):
+        return "question"
+    if any(k in lowered for k in STYLE_KEYWORDS["money"]):
+        return "money"
+    if any(k in lowered for k in STYLE_KEYWORDS["warning"]):
+        return "warning"
+    if any(k in lowered for k in STYLE_KEYWORDS["hype"]):
+        return "hype"
+    if "!" in text:
+        return "impact"
+    return "neutral"
 
 def _parse_transcript_segments(transcript: Optional[str]) -> List[Dict]:
     if not transcript:
@@ -299,7 +329,19 @@ def _build_ffmpeg_command(video_path: str, start: float, duration: float, output
     if af_parts:
         cmd.extend(["-af", ",".join(af_parts)])
 
-    cmd.extend(["-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-c:a", "aac", "-b:a", "128k", output_path])
+    encoder = (settings.VIDEO_ENCODER or "auto").strip().lower()
+    if encoder == "auto":
+        encoder = "h264_videotoolbox"
+
+    threads = max(1, settings.VIDEO_THREADS)
+    if encoder == "h264_videotoolbox":
+        cmd.extend(["-c:v", "h264_videotoolbox", "-b:v", "5M", "-maxrate", "6M", "-bufsize", "10M"])
+    else:
+        profile = (settings.PROCESSING_PROFILE or "balanced").strip().lower()
+        preset = "veryfast" if profile == "eco" else "ultrafast"
+        cmd.extend(["-c:v", "libx264", "-preset", preset, "-crf", "23", "-threads", str(threads)])
+
+    cmd.extend(["-c:a", "aac", "-b:a", "128k", output_path])
     return cmd
 
 def _run_ffmpeg_command(cmd: List[str], process_id: str = None, active_pids: dict = None) -> tuple[bool, str]:
@@ -357,6 +399,41 @@ def _write_clip_vtt(vtt_path: str, segments: List[Dict], clip_start: float, clip
         f.write("\n".join(lines).strip() + "\n")
     return True
 
+def _write_clip_cues_json(cues_path: str, segments: List[Dict], clip_start: float, clip_end: float, max_words: int) -> bool:
+    cues: List[Dict] = []
+    for seg in segments:
+        overlap_start = max(clip_start, seg["start"])
+        overlap_end = min(clip_end, seg["end"])
+        if overlap_end <= overlap_start:
+            continue
+
+        relative_start = overlap_start - clip_start
+        relative_end = overlap_end - clip_start
+        words_chunks = _split_caption_words(seg["text"], max_words)
+        chunk_duration = max(0.35, (relative_end - relative_start) / max(1, len(words_chunks)))
+
+        for idx, chunk in enumerate(words_chunks):
+            chunk_start = relative_start + idx * chunk_duration
+            chunk_end = min(relative_end, chunk_start + chunk_duration)
+            if chunk_end > chunk_start:
+                cues.append({
+                    "start": round(chunk_start, 3),
+                    "end": round(chunk_end, 3),
+                    "text": chunk,
+                    "style": _choose_caption_style(chunk),
+                })
+
+    if not cues:
+        return False
+
+    payload = {
+        "styles": CAPTION_STYLES,
+        "cues": cues,
+    }
+    with open(cues_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False)
+    return True
+
 def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active_pids: dict = None, thought_callback=None, transcript: Optional[str] = None) -> List[str]:
     """Cuts a video into clips with PID tracking and live streaming."""
     output_clips = []
@@ -369,12 +446,6 @@ def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active
     max_len = settings.CLIP_MAX_SECONDS
     padding = settings.CLIP_PADDING_SECONDS
     transcript_segments = _parse_transcript_segments(transcript)
-    highlight_words = {
-        w.strip().lower()
-        for w in (settings.CLIP_CAPTION_HIGHLIGHT_WORDS or "").split(",")
-        if w.strip()
-    }
-    preset_filters = _get_format_preset_filters()
     can_burn_subtitles = _ffmpeg_supports_filter("subtitles")
 
     for i, hook in enumerate(hooks):
@@ -422,6 +493,7 @@ def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active
         subtitle_ext = "ass" if settings.CLIP_ENABLE_ANIMATED_CAPTIONS else "srt"
         subtitle_path = os.path.join(clips_dir, f"{clean_base_name}_hook_{i+1}.{subtitle_ext}")
         subtitle_vtt_path = os.path.join(clips_dir, f"{clean_base_name}_hook_{i+1}.vtt")
+        subtitle_cues_path = os.path.join(clips_dir, f"{clean_base_name}_hook_{i+1}.cues.json")
         
         if thought_callback:
             thought_callback(process_id, f"FFmpeg: Surgically extracting clip {i+1} ({start:.2f}s to {end:.2f}s | {duration:.2f}s)...")
@@ -430,6 +502,13 @@ def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active
             if settings.CLIP_ENABLE_SUBTITLES and transcript_segments:
                 _write_clip_vtt(
                     subtitle_vtt_path,
+                    transcript_segments,
+                    clip_start=start,
+                    clip_end=end,
+                    max_words=max(3, settings.CLIP_SUBTITLE_MAX_WORDS),
+                )
+                _write_clip_cues_json(
+                    subtitle_cues_path,
                     transcript_segments,
                     clip_start=start,
                     clip_end=end,

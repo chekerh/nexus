@@ -304,6 +304,48 @@ function bindClipPublishActions() {
     });
 }
 
+async function bindStyledCaptionOverlays(clips) {
+    for (let index = 0; index < clips.length; index++) {
+        const clip = clips[index];
+        const video = document.getElementById(`video-${index}`);
+        const overlay = document.getElementById(`caption-overlay-${index}`);
+        if (!video || !overlay) continue;
+
+        const cuesUrl = `/video_clips/${encodeURIComponent(clip.replace(/\.mp4$/i, '.cues.json'))}`;
+        let cuesPayload = null;
+        try {
+            const resp = await fetch(cuesUrl);
+            if (resp.ok) cuesPayload = await resp.json();
+        } catch (_) {}
+
+        if (video.textTracks && video.textTracks[0]) {
+            video.textTracks[0].mode = 'showing';
+        }
+
+        if (!cuesPayload || !Array.isArray(cuesPayload.cues)) {
+            continue;
+        }
+
+        const cues = cuesPayload.cues;
+        const updateOverlay = () => {
+            const t = video.currentTime || 0;
+            const active = cues.find(c => t >= c.start && t <= c.end);
+            if (!active) {
+                overlay.innerHTML = '';
+                overlay.className = 'caption-overlay';
+                return;
+            }
+            overlay.innerHTML = `<span>${active.text}</span>`;
+            overlay.className = `caption-overlay ${(active.style ? `cap-${active.style}` : 'cap-neutral')}`;
+        };
+
+        video.addEventListener('timeupdate', updateOverlay);
+        video.addEventListener('seeked', updateOverlay);
+        video.addEventListener('play', updateOverlay);
+        video.addEventListener('pause', updateOverlay);
+    }
+}
+
 function showResults(data) {
     statusSection.classList.add('hidden');
     resultsSection.classList.remove('hidden');
@@ -334,9 +376,12 @@ function showResults(data) {
             return `
                 <div class="card clip-card" id="clip-${index}" data-filename="${clip}">
                     <h4>${hook.hook_name}</h4>
-                    <video controls width="100%" src="/video_clips/${encodedClip}">
+                    <div class="video-shell">
+                    <video id="video-${index}" controls width="100%" src="/video_clips/${encodedClip}">
                         <track kind="subtitles" srclang="en" label="English" src="/video_clips/${vtt}" default>
                     </video>
+                    <div id="caption-overlay-${index}" class="caption-overlay"></div>
+                    </div>
                     <div class="clip-info">
                         <p>${hook.caption}</p>
                         <a href="/video_clips/${encodedClip}" download class="btn btn-secondary">Download Clip</a>
@@ -354,6 +399,7 @@ function showResults(data) {
             `;
         }).join('');
         bindClipPublishActions();
+        bindStyledCaptionOverlays(data.clips);
     } else {
         clipsContainer.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: var(--text-dim);">No clips were generated for this video.</p>';
     }

@@ -166,6 +166,24 @@ def _candidate_from_segment(seg: Dict, target_len: float, total_duration: float)
         start = max(0.0, end - target_len)
     return round(start, 2), round(end, 2)
 
+def _adaptive_target_len(seg: Dict, text_score: float, density: float, wps: float) -> float:
+    """Derive a dynamic clip length so outputs are not all same duration."""
+    min_len = settings.CLIP_MIN_SECONDS
+    max_len = settings.CLIP_MAX_SECONDS
+    diversity = max(0.0, min(1.0, settings.CLIP_DURATION_DIVERSITY))
+
+    base = min_len + ((max_len - min_len) * 0.45)
+    # More words and denser speech can support longer clips.
+    word_count = len(seg.get("text", "").split())
+    length_from_words = min(1.0, word_count / 22.0)
+    score_factor = min(1.0, text_score / 6.0)
+    speech_factor = min(1.0, (density * 0.7) + (min(wps, 3.0) / 3.0) * 0.3)
+    question_bonus = 0.08 if "?" in seg.get("text", "") else 0.0
+
+    dynamic_factor = (0.45 * length_from_words) + (0.35 * score_factor) + (0.20 * speech_factor) + question_bonus
+    target = base + (max_len - min_len) * diversity * (dynamic_factor - 0.5)
+    return round(max(min_len, min(max_len, target)), 2)
+
 def _speech_metrics(start: float, end: float, segments: List[Dict]) -> Tuple[float, float]:
     duration = max(0.001, end - start)
     spoken_seconds = 0.0
@@ -199,13 +217,16 @@ def _build_candidates(segments: List[Dict], scene_cuts: List[float], total_durat
     if not segments:
         return []
 
-    target_len = max(settings.CLIP_MIN_SECONDS, min(28.0, settings.CLIP_MAX_SECONDS))
     candidates = []
     for seg in segments:
         text_score = _score_segment_text(seg["text"])
         if text_score <= 0:
             continue
-
+        # Preliminary window for speech metrics.
+        probe_len = max(settings.CLIP_MIN_SECONDS, min(24.0, settings.CLIP_MAX_SECONDS))
+        probe_start, probe_end = _candidate_from_segment(seg, probe_len, total_duration)
+        density_probe, wps_probe = _speech_metrics(probe_start, probe_end, segments)
+        target_len = _adaptive_target_len(seg, text_score, density_probe, wps_probe)
         start, end = _candidate_from_segment(seg, target_len, total_duration)
         density, wps = _speech_metrics(start, end, segments)
         score = (
@@ -222,6 +243,7 @@ def _build_candidates(segments: List[Dict], scene_cuts: List[float], total_durat
             "text_score": text_score,
             "speech_density": density,
             "words_per_sec": wps,
+            "target_len": round(end - start, 2),
             "reason": seg["text"][:120],
         })
 
@@ -286,7 +308,7 @@ def _candidate_windows_summary_v3(candidates: List[Dict], scene_cuts: List[float
     ]
     for c in candidates:
         lines.append(
-            f"id={c['id']} | {c['start']}s-{c['end']}s | score={c['score']} | density={c['speech_density']} | wps={c['words_per_sec']} | cue={c['reason']}"
+            f"id={c['id']} | {c['start']}s-{c['end']}s ({c.get('target_len', round(c['end']-c['start'],2))}s) | score={c['score']} | density={c['speech_density']} | wps={c['words_per_sec']} | cue={c['reason']}"
         )
     if scene_cuts:
         preview = ", ".join([f"{x}s" for x in scene_cuts[:20]])
@@ -352,6 +374,7 @@ def _snap_hooks_to_candidates(hooks: List[Dict], candidates: List[Dict]) -> List
             hook["end"] = best["end"]
             if "confidence" not in hook:
                 hook["confidence"] = round(min(0.95, max(0.35, best["score"] / 10.0)), 2)
+            hook["duration_hint"] = round(best.get("target_len", best["end"] - best["start"]), 2)
 
         result.append(hook)
 
@@ -390,7 +413,9 @@ def analyze_transcript(transcript: str, video_path: Optional[str] = None) -> Opt
         if not cleaned_transcript:
             cleaned_transcript = transcript
         total_duration = _video_duration_from_path(video_path)
-        scene_cuts = _detect_scene_cuts(video_path)
+        scene_cuts = []
+        if settings.ANALYSIS_ENABLE_SCENE_DETECTION and settings.PROCESSING_PROFILE in {"balanced", "quality"}:
+            scene_cuts = _detect_scene_cuts(video_path)
         candidates = _build_candidates(segments, scene_cuts, total_duration)
         candidate_summary = _candidate_windows_summary_v3(candidates, scene_cuts)
         if not candidate_summary:

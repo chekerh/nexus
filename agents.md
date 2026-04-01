@@ -1,20 +1,38 @@
-# PubReelo: AI Agents Definition
+# Nexus-UGC: Agent Definitions (Current)
 
-This document defines the specialized AI entities that form the PubReelo Intelligence Layer.
+## 1) Perception Agent
+- **Runtime:** Whisper.cpp
+- **Purpose:** timestamped transcript extraction from raw video audio.
+- **Behavior:** filter out non-content runtime logs before downstream analysis.
 
-## 1. Perception Agent (The Transcriber)
-- **Model:** Whisper.cpp (OpenAI Whisper GGML)
-- **Role:** High-fidelity audio perception.
-- **Goal:** To convert raw audio into a clean, accurate text transcript.
-- **Constraints:** Optimized for speed and low CPU overhead on local machines. Handles various accents and audio quality levels.
+## 2) Strategist Agent
+- **Runtime:** Qwen via Ollama
+- **Purpose:** select high-retention windows + captions + confidence.
+- **Inputs:**
+	- strategist playbook prompt file
+	- viral signals rubric
+	- hybrid-ranked candidate windows
+- **Output policy:** produce 3 hooks with adaptive durations, not uniform clip lengths.
 
-## 2. Strategist Agent (The Analyst)
-- **Model:** Qwen3:30b (Ollama)
-- **Role:** Creative Director & Content Strategist.
-- **Goal:** Identify retention-driven segments and explain *why* they were chosen.
-- **Expressiveness (Phase 3):** Now provides real-time "thinking logs" (e.g., "Evaluating comedic timing at 0:45", "Analyzing retention drop-off") to keep the user engaged.
+## 3) Scoring Agent (Heuristic Layer)
+- **Purpose:** pre-rank candidate windows for strategist grounding.
+- **Signals:** semantic keywords, speech density, optional scene boundaries, duration diversity.
 
-## 3. Workflow Manager (The Orchestrator)
-- **Role:** Controller & Editor.
-- **Goal:** Manage execution lifecycle with cancellation support.
-- **Interruptibility:** Can now handle "Stop Analysis" requests to kill background processes.
+## 4) Caption Style Agent (Heuristic Style Selector)
+- **Purpose:** select phrase-level subtitle style classes.
+- **Styles:** neutral, impact, question, money, warning, hype.
+- **Artifacts:** cue JSON sidecar consumed by frontend overlay renderer.
+
+## 5) Editing Agent
+- **Runtime:** FFmpeg pipeline with fallbacks.
+- **Purpose:** render robust outputs even if advanced filters are unavailable.
+- **Modes:** full effects -> simplified effects -> minimal baseline.
+
+## 6) Publishing Agent
+- **Purpose:** route clips to selected account/platform.
+- **Modes:**
+	- direct API publish when credentials are valid
+	- safe manual fallback when not
+
+## 7) Orchestrator Agent
+- **Purpose:** lifecycle control, progress stream, cancellation, result aggregation.

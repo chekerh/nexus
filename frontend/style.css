@@ -243,6 +243,41 @@ body {
     margin-bottom: 1rem;
 }
 
+.video-shell {
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+.caption-overlay {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 14px;
+    max-width: 92%;
+    text-align: center;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.caption-overlay span {
+    display: inline-block;
+    padding: 0.35rem 0.75rem;
+    border-radius: 0.45rem;
+    background: rgba(0,0,0,0.55);
+    color: #fff;
+    font-weight: 800;
+    line-height: 1.2;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.caption-overlay.cap-neutral span { font-size: 1.1rem; }
+.caption-overlay.cap-impact span { font-size: 1.2rem; background: rgba(36, 36, 36, 0.72); }
+.caption-overlay.cap-question span { font-size: 1.15rem; background: rgba(61, 59, 130, 0.72); }
+.caption-overlay.cap-money span { font-size: 1.2rem; color: #9effb0; background: rgba(7, 58, 20, 0.78); }
+.caption-overlay.cap-warning span { font-size: 1.2rem; color: #ffd3d3; background: rgba(112, 20, 20, 0.82); }
+.caption-overlay.cap-hype span { font-size: 1.25rem; color: #fff7b3; background: rgba(102, 69, 9, 0.82); }
+
 .clip-info p {
     font-size: 0.85rem;
     color: var(--text-dim);
