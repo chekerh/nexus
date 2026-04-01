@@ -19,6 +19,8 @@ FORMAT_PRESET_FILTERS = {
     "portrait_4_5": ["scale=1080:1350:force_original_aspect_ratio=increase", "crop=1080:1350"],
 }
 
+_FFMPEG_FILTER_CACHE: Optional[set[str]] = None
+
 def sanitize_filename(filename: str) -> str:
     """Removes special characters and spaces from filenames."""
     # Remove file extension first
@@ -61,6 +63,16 @@ def _seconds_to_srt(seconds: float) -> str:
     s = total_ms // 1000
     ms = total_ms % 1000
     return f"{h:02}:{m:02}:{s:02},{ms:03}"
+
+def _seconds_to_vtt(seconds: float) -> str:
+    total_ms = int(round(max(0.0, seconds) * 1000))
+    h = total_ms // 3600000
+    total_ms %= 3600000
+    m = total_ms // 60000
+    total_ms %= 60000
+    s = total_ms // 1000
+    ms = total_ms % 1000
+    return f"{h:02}:{m:02}:{s:02}.{ms:03}"
 
 def _seconds_to_ass(seconds: float) -> str:
     centis = int(round(max(0.0, seconds) * 100))
@@ -208,6 +220,21 @@ def _get_format_preset_filters() -> List[str]:
     preset = (settings.CLIP_FORMAT_PRESET or "source").strip().lower()
     return list(FORMAT_PRESET_FILTERS.get(preset, FORMAT_PRESET_FILTERS["source"]))
 
+def _ffmpeg_supports_filter(filter_name: str) -> bool:
+    global _FFMPEG_FILTER_CACHE
+    try:
+        if _FFMPEG_FILTER_CACHE is None:
+            result = subprocess.run(["ffmpeg", "-hide_banner", "-filters"], capture_output=True, text=True)
+            names = set()
+            for line in (result.stdout or "").splitlines():
+                parts = line.split()
+                if len(parts) >= 4:
+                    names.add(parts[1])
+            _FFMPEG_FILTER_CACHE = names
+        return filter_name in (_FFMPEG_FILTER_CACHE or set())
+    except Exception:
+        return False
+
 def _build_ffmpeg_command(video_path: str, start: float, duration: float, output_path: str, subtitle_path: Optional[str], transcript_segments: List[Dict], process_id: str = None, thought_callback=None, clip_index: int = 0, enable_format: bool = True, enable_transitions: bool = True, enable_zoom: bool = True, enable_subtitles: bool = True, animated_captions: bool = True) -> List[str]:
     cmd = ["ffmpeg", "-y", "-ss", str(start), "-i", video_path, "-t", str(duration)]
     vf_parts = _get_format_preset_filters() if enable_format else []
@@ -294,6 +321,42 @@ def _run_ffmpeg_command(cmd: List[str], process_id: str = None, active_pids: dic
         active_pids.pop(process_id, None)
     return process.returncode == 0, "\n".join(output_lines)
 
+def _write_clip_vtt(vtt_path: str, segments: List[Dict], clip_start: float, clip_end: float, max_words: int) -> bool:
+    clip_entries: List[Dict] = []
+    for seg in segments:
+        overlap_start = max(clip_start, seg["start"])
+        overlap_end = min(clip_end, seg["end"])
+        if overlap_end <= overlap_start:
+            continue
+
+        relative_start = overlap_start - clip_start
+        relative_end = overlap_end - clip_start
+        words_chunks = _split_caption_words(seg["text"], max_words)
+        chunk_duration = max(0.35, (relative_end - relative_start) / max(1, len(words_chunks)))
+
+        for idx, chunk in enumerate(words_chunks):
+            chunk_start = relative_start + idx * chunk_duration
+            chunk_end = min(relative_end, chunk_start + chunk_duration)
+            if chunk_end > chunk_start:
+                clip_entries.append({
+                    "start": chunk_start,
+                    "end": chunk_end,
+                    "text": chunk,
+                })
+
+    if not clip_entries:
+        return False
+
+    lines = ["WEBVTT", ""]
+    for entry in clip_entries:
+        lines.append(f"{_seconds_to_vtt(entry['start'])} --> {_seconds_to_vtt(entry['end'])}")
+        lines.append(entry["text"])
+        lines.append("")
+
+    with open(vtt_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines).strip() + "\n")
+    return True
+
 def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active_pids: dict = None, thought_callback=None, transcript: Optional[str] = None) -> List[str]:
     """Cuts a video into clips with PID tracking and live streaming."""
     output_clips = []
@@ -312,6 +375,7 @@ def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active
         if w.strip()
     }
     preset_filters = _get_format_preset_filters()
+    can_burn_subtitles = _ffmpeg_supports_filter("subtitles")
 
     for i, hook in enumerate(hooks):
 
@@ -357,14 +421,26 @@ def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active
         output_path = os.path.join(clips_dir, output_name)
         subtitle_ext = "ass" if settings.CLIP_ENABLE_ANIMATED_CAPTIONS else "srt"
         subtitle_path = os.path.join(clips_dir, f"{clean_base_name}_hook_{i+1}.{subtitle_ext}")
+        subtitle_vtt_path = os.path.join(clips_dir, f"{clean_base_name}_hook_{i+1}.vtt")
         
         if thought_callback:
             thought_callback(process_id, f"FFmpeg: Surgically extracting clip {i+1} ({start:.2f}s to {end:.2f}s | {duration:.2f}s)...")
         
         try:
+            if settings.CLIP_ENABLE_SUBTITLES and transcript_segments:
+                _write_clip_vtt(
+                    subtitle_vtt_path,
+                    transcript_segments,
+                    clip_start=start,
+                    clip_end=end,
+                    max_words=max(3, settings.CLIP_SUBTITLE_MAX_WORDS),
+                )
+                if thought_callback and not can_burn_subtitles:
+                    thought_callback(process_id, f"Caption Engine: ffmpeg lacks 'subtitles' filter; using soft subtitle track fallback for clip {i+1}.")
+
             attempts = [
-                {"enable_format": True, "enable_transitions": True, "enable_zoom": True, "enable_subtitles": True, "animated_captions": True},
-                {"enable_format": True, "enable_transitions": True, "enable_zoom": True, "enable_subtitles": True, "animated_captions": False},
+                {"enable_format": True, "enable_transitions": True, "enable_zoom": True, "enable_subtitles": can_burn_subtitles, "animated_captions": True},
+                {"enable_format": True, "enable_transitions": True, "enable_zoom": True, "enable_subtitles": can_burn_subtitles, "animated_captions": False},
                 {"enable_format": True, "enable_transitions": True, "enable_zoom": True, "enable_subtitles": False, "animated_captions": False},
                 {"enable_format": False, "enable_transitions": False, "enable_zoom": False, "enable_subtitles": False, "animated_captions": False},
             ]

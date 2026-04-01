@@ -328,12 +328,15 @@ function showResults(data) {
         clipsContainer.innerHTML = data.clips.map((clip, index) => {
             const hook = data.analysis.hooks[index] || { hook_name: `Clip ${index+1}`, caption: '' };
             const encodedClip = encodeURIComponent(clip);
+            const vtt = encodeURIComponent(clip.replace(/\.mp4$/i, '.vtt'));
             const defaultTitle = hook.hook_name || `Clip ${index + 1}`;
             const defaultDesc = hook.caption || '';
             return `
                 <div class="card clip-card" id="clip-${index}" data-filename="${clip}">
                     <h4>${hook.hook_name}</h4>
-                    <video controls width="100%" src="/video_clips/${encodedClip}"></video>
+                    <video controls width="100%" src="/video_clips/${encodedClip}">
+                        <track kind="subtitles" srclang="en" label="English" src="/video_clips/${vtt}" default>
+                    </video>
                     <div class="clip-info">
                         <p>${hook.caption}</p>
                         <a href="/video_clips/${encodedClip}" download class="btn btn-secondary">Download Clip</a>
