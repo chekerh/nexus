@@ -434,7 +434,8 @@ def analyze_transcript(transcript: str, video_path: Optional[str] = None) -> Opt
             messages=[
                 {'role': 'system', 'content': system_prompt},
                 {'role': 'user', 'content': user_payload},
-            ]
+            ],
+            keep_alive=settings.OLLAMA_KEEP_ALIVE,
         )
         content = response['message']['content'].strip()
 

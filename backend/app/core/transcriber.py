@@ -43,8 +43,17 @@ def transcribe_video(video_path: str, process_id: str = None, active_pids: dict 
 
     all_output = []
     try:
-        # -np: no prints (results only), but since we want to see progress, we'll keep it simple
-        cmd = [settings.WHISPER_BINARY_PATH, "-m", settings.WHISPER_MODEL_PATH, "-f", audio_path]
+        cmd = [
+            settings.WHISPER_BINARY_PATH,
+            "-m", settings.WHISPER_MODEL_PATH,
+            "-f", audio_path,
+            "-t", str(max(1, settings.WHISPER_THREADS)),
+            "-p", str(max(1, settings.WHISPER_PROCESSORS)),
+        ]
+        if settings.WHISPER_LANGUAGE:
+            cmd.extend(["-l", settings.WHISPER_LANGUAGE])
+        if settings.WHISPER_TRANSLATE:
+            cmd.append("-tr")
         
         process = subprocess.Popen(
             cmd,
@@ -77,9 +86,6 @@ def transcribe_video(video_path: str, process_id: str = None, active_pids: dict 
             print(f"Whisper transcription failed with code {process.returncode}")
             return None
             
-        if os.path.exists(audio_path):
-            os.remove(audio_path)
-            
         return "\n".join(all_output)
     except Exception as e:
         print(f"Error during transcription: {str(e)}")
@@ -87,3 +93,5 @@ def transcribe_video(video_path: str, process_id: str = None, active_pids: dict 
     finally:
         if process_id and active_pids is not None:
             active_pids.pop(process_id, None)
+        if os.path.exists(audio_path):
+            os.remove(audio_path)

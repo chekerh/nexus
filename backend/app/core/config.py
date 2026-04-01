@@ -8,9 +8,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 class Settings(BaseSettings):
     WHISPER_BINARY_PATH: str = "/usr/local/bin/whisper-main"
     WHISPER_MODEL_PATH: str = "/usr/local/share/whisper/models/ggml-base.en.bin"
-    OLLAMA_MODEL: str = "qwen2.5:32b"
+    OLLAMA_MODEL: str = "qwen2.5:7b"
     OLLAMA_ANALYST_MODEL: str = ""
     OLLAMA_STYLE_MODEL: str = "qwen2.5:3b"
+    OLLAMA_KEEP_ALIVE: str = "3m"
+    WHISPER_THREADS: int = 4
+    WHISPER_PROCESSORS: int = 1
+    WHISPER_LANGUAGE: str = "en"
+    WHISPER_TRANSLATE: bool = False
     UPLOAD_DIR: str = str(BASE_DIR / "backend" / "data")
     FRONTEND_DIR: str = str(BASE_DIR / "frontend")
     ACCOUNTS_DB_PATH: str = str(BASE_DIR / "backend" / "data" / "accounts.json")
@@ -31,7 +36,7 @@ class Settings(BaseSettings):
     CLIP_SUBTITLE_MAX_WORDS: int = 10
     CLIP_ENABLE_ANIMATED_CAPTIONS: bool = True
     CLIP_CAPTION_FONT_SIZE: int = 48
-    CLIP_CAPTION_HIGHLIGHT_WORDS: str = "crazy,insane,secret,money,warning,never,best,worst,failed,mistake"
+    CLIP_CAPTION_HIGHLIGHT_WORDS: str = ""
     CLIP_FORMAT_PRESET: str = "vertical_9_16"
     CLIP_DURATION_DIVERSITY: float = 0.45
     ANALYSIS_ENABLE_SCENE_DETECTION: bool = False

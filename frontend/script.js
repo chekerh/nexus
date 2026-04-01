@@ -6,6 +6,12 @@ const resultsSection = document.getElementById('results-section');
 const statusMessage = document.getElementById('status-message');
 const transcriptContent = document.getElementById('transcript-content');
 const analysisContent = document.getElementById('analysis-content');
+const statusTimer = document.getElementById('status-timer');
+const timingSummary = document.getElementById('timing-summary');
+const navPipeline = document.getElementById('nav-pipeline');
+const navAccounts = document.getElementById('nav-accounts');
+const sidebarAccountsPanel = document.getElementById('sidebar-accounts-panel');
+const toastContainer = document.getElementById('toast-container');
 
 const stopBtn = document.getElementById('stop-btn');
 const thinkingConsole = document.getElementById('thinking-console');
@@ -27,6 +33,77 @@ const publishConsole = document.getElementById('publish-console');
 let selectedFile = null;
 let currentProcessId = null;
 let accountsCache = [];
+let statusTimerInterval = null;
+let statusStartMs = 0;
+
+function formatElapsed(seconds) {
+    const total = Math.max(0, Math.floor(seconds));
+    const mm = String(Math.floor(total / 60)).padStart(2, '0');
+    const ss = String(total % 60).padStart(2, '0');
+    return `${mm}:${ss}`;
+}
+
+function startStatusTimer() {
+    stopStatusTimer();
+    statusStartMs = Date.now();
+    statusTimer.innerText = '00:00';
+    statusTimerInterval = setInterval(() => {
+        statusTimer.innerText = formatElapsed((Date.now() - statusStartMs) / 1000);
+    }, 500);
+}
+
+function stopStatusTimer() {
+    if (statusTimerInterval) {
+        clearInterval(statusTimerInterval);
+        statusTimerInterval = null;
+    }
+}
+
+function renderTimingSummary(data) {
+    const t = data?.timing || {};
+    if (!t.total_seconds) {
+        timingSummary.innerText = 'Awaiting stage metrics...';
+        return;
+    }
+    timingSummary.innerText = `T:${t.total_seconds}s | W:${t.transcription_seconds || 0}s | A:${t.analysis_seconds || 0}s | C:${t.cutting_seconds || 0}s`;
+}
+
+function showToast(title, subtitle = '') {
+    if (!toastContainer) return;
+    const el = document.createElement('div');
+    el.className = 'toast';
+    el.innerHTML = `<div class="toast-title">${title}</div>${subtitle ? `<div class="toast-sub">${subtitle}</div>` : ''}`;
+    toastContainer.appendChild(el);
+    setTimeout(() => el.remove(), 6500);
+}
+
+function showClipReadyNotification(processId, clipCount) {
+    const uniqueCode = `CUTS-${(processId || '').slice(-6).toUpperCase()}-${Date.now().toString().slice(-5)}`;
+    const body = `${clipCount} clip(s) generated. Ref ${uniqueCode}`;
+    showToast('Clips ready', body);
+
+    if (!('Notification' in window)) return;
+    const fire = () => new Notification('Nexus UGC: Clips generated', { body, tag: uniqueCode });
+    if (Notification.permission === 'granted') {
+        fire();
+    } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(p => {
+            if (p === 'granted') fire();
+        });
+    }
+}
+
+function setSidebarView(view) {
+    if (view === 'accounts') {
+        sidebarAccountsPanel.classList.remove('hidden');
+        navAccounts.classList.add('active');
+        navPipeline.classList.remove('active');
+    } else {
+        sidebarAccountsPanel.classList.add('hidden');
+        navPipeline.classList.add('active');
+        navAccounts.classList.remove('active');
+    }
+}
 
 // Handle File Selection
 dropzone.onclick = () => fileInput.click();
@@ -52,6 +129,8 @@ processBtn.onclick = async () => {
     resultsSection.classList.add('hidden');
     thinkingConsole.innerHTML = '<div class="thinking-line">Initializing local AI engine...</div>';
     statusTitle.innerText = "AI Processing...";
+    timingSummary.innerText = 'Awaiting stage metrics...';
+    startStatusTimer();
 
     try {
         const response = await fetch('/process', {
@@ -103,20 +182,27 @@ async function pollStatus(processId) {
 
             if (data.status === 'completed') {
                 clearInterval(poll);
-                showResults(data);
+                stopStatusTimer();
+                showResults(data, processId);
+                showClipReadyNotification(processId, (data.clips || []).length);
             } else if (data.status === 'error') {
                 clearInterval(poll);
+                stopStatusTimer();
                 statusTitle.innerText = "Process Failed";
                 thinkingConsole.innerHTML += `<div class="thinking-line error">CRITICAL ERROR: ${data.error}</div>`;
                 processBtn.disabled = false;
             } else if (data.status === 'cancelled') {
                 clearInterval(poll);
+                stopStatusTimer();
                 statusTitle.innerText = "Analysis Cancelled";
                 thinkingConsole.innerHTML += `<div class="thinking-line">Process terminated by user. Resources released.</div>`;
                 processBtn.disabled = false;
             }
+
+            renderTimingSummary(data);
         } catch (err) {
             clearInterval(poll);
+            stopStatusTimer();
             console.error(err);
         }
     }, 1500);
@@ -346,7 +432,7 @@ async function bindStyledCaptionOverlays(clips) {
     }
 }
 
-function showResults(data) {
+function showResults(data, processId) {
     statusSection.classList.add('hidden');
     resultsSection.classList.remove('hidden');
     
@@ -405,7 +491,21 @@ function showResults(data) {
     }
 
     processBtn.disabled = false;
+    if (data?.timing?.total_seconds) {
+        showToast('Pipeline complete', `Process ${String(processId || '').slice(-6).toUpperCase()} finished in ${data.timing.total_seconds}s`);
+    }
 }
+
+navPipeline.onclick = (e) => {
+    e.preventDefault();
+    setSidebarView('pipeline');
+};
+
+navAccounts.onclick = (e) => {
+    e.preventDefault();
+    setSidebarView('accounts');
+};
 
 loadAccounts();
 updateAccountCredentialInputs();
+setSidebarView('pipeline');

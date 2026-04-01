@@ -15,10 +15,37 @@
         <aside class="sidebar">
             <div class="logo">Nexus-UGC</div>
             <nav>
-                <a href="#" class="nav-item active">AI Pipeline</a>
-                <a href="#" class="nav-item disabled">Account Groups</a>
+                <a href="#" class="nav-item active" id="nav-pipeline">AI Pipeline</a>
+                <a href="#" class="nav-item" id="nav-accounts">Account Groups</a>
                 <a href="#" class="nav-item disabled">History</a>
             </nav>
+
+            <section class="card accounts-section sidebar-accounts hidden" id="sidebar-accounts-panel">
+                <h3>Account Groups</h3>
+                <p class="accounts-subtitle">Manage posting accounts for TikTok, Instagram, and YouTube.</p>
+                <div class="account-form-grid">
+                    <select id="account-platform">
+                        <option value="tiktok">TikTok</option>
+                        <option value="instagram">Instagram</option>
+                        <option value="youtube">YouTube</option>
+                    </select>
+                    <input id="account-name" type="text" placeholder="Account name (e.g. @mybrand_main)">
+                    <input id="account-notes" type="text" placeholder="Notes (optional)">
+                    <input id="account-refresh-token" type="password" placeholder="YouTube refresh token (optional for auto-publish)">
+                    <select id="account-youtube-privacy">
+                        <option value="private">YouTube privacy: private</option>
+                        <option value="unlisted">YouTube privacy: unlisted</option>
+                        <option value="public">YouTube privacy: public</option>
+                    </select>
+                    <input id="account-instagram-user-id" type="text" placeholder="Instagram user ID (for API publish)">
+                    <input id="account-instagram-token" type="password" placeholder="Instagram long-lived access token">
+                    <input id="account-tiktok-open-id" type="text" placeholder="TikTok open_id (optional)">
+                    <input id="account-tiktok-refresh-token" type="password" placeholder="TikTok refresh token (preferred)">
+                    <input id="account-tiktok-access-token" type="password" placeholder="TikTok access token (optional)">
+                    <button class="btn btn-secondary" id="add-account-btn">Add Account</button>
+                </div>
+                <div id="accounts-list" class="accounts-list"></div>
+            </section>
         </aside>
 
         <!-- Main Content -->
@@ -46,39 +73,15 @@
                 <button class="btn btn-primary" id="process-btn" disabled>Start Analysis</button>
             </section>
 
-            <!-- Accounts Section -->
-            <section class="card accounts-section">
-                <h3>Account Groups</h3>
-                <p class="accounts-subtitle">Add as many destination accounts as you want and select one per clip.</p>
-                <div class="account-form-grid">
-                    <select id="account-platform">
-                        <option value="tiktok">TikTok</option>
-                        <option value="instagram">Instagram</option>
-                        <option value="youtube">YouTube</option>
-                    </select>
-                    <input id="account-name" type="text" placeholder="Account name (e.g. @mybrand_main)">
-                    <input id="account-notes" type="text" placeholder="Notes (optional)">
-                    <input id="account-refresh-token" type="password" placeholder="YouTube refresh token (optional for auto-publish)">
-                    <select id="account-youtube-privacy">
-                        <option value="private">YouTube privacy: private</option>
-                        <option value="unlisted">YouTube privacy: unlisted</option>
-                        <option value="public">YouTube privacy: public</option>
-                    </select>
-                    <input id="account-instagram-user-id" type="text" placeholder="Instagram user ID (for API publish)">
-                    <input id="account-instagram-token" type="password" placeholder="Instagram long-lived access token">
-                    <input id="account-tiktok-open-id" type="text" placeholder="TikTok open_id (optional)">
-                    <input id="account-tiktok-refresh-token" type="password" placeholder="TikTok refresh token (preferred)">
-                    <input id="account-tiktok-access-token" type="password" placeholder="TikTok access token (optional)">
-                    <button class="btn btn-secondary" id="add-account-btn">Add Account</button>
-                </div>
-                <div id="accounts-list" class="accounts-list"></div>
-            </section>
-
             <!-- Status Section -->
             <section id="status-section" class="status-section hidden">
                 <div class="thinking-header">
                     <span class="pulse-dot"></span>
                     <h2 id="status-title">AI Processing...</h2>
+                </div>
+                <div class="status-meta-row">
+                    <span class="account-tag timer-tag">Elapsed: <strong id="status-timer">00:00</strong></span>
+                    <span class="account-tag" id="timing-summary">Awaiting stage metrics...</span>
                 </div>
                 <div id="thinking-console" class="thinking-console">
                     <!-- Thoughts will be injected here -->
@@ -108,6 +111,7 @@
             </section>
         </main>
     </div>
+    <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
     <script src="script.js"></script>
 </body>
 </html>

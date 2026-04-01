@@ -171,6 +171,7 @@ def _infer_caption_styles_with_ai(texts: List[str]) -> List[str]:
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
+            keep_alive=settings.OLLAMA_KEEP_ALIVE,
         )
         content = (response.get("message", {}) or {}).get("content", "").strip()
         match = re.search(r"\{[\s\S]*\}", content)
@@ -238,7 +239,27 @@ def _write_clip_srt(srt_path: str, segments: List[Dict], clip_start: float, clip
         f.write("\n".join(lines).strip() + "\n")
     return True
 
-def _write_clip_ass(ass_path: str, segments: List[Dict], clip_start: float, clip_end: float, max_words: int, highlight_words: set[str], font_size: int) -> bool:
+def _ass_style_name(style_id: str) -> str:
+    mapping = {
+        "neutral": "CapNeutral",
+        "impact": "CapImpact",
+        "question": "CapQuestion",
+        "money": "CapMoney",
+        "warning": "CapWarning",
+        "hype": "CapHype",
+    }
+    return mapping.get(style_id, "CapNeutral")
+
+def _ass_effect_text(style_id: str, text: str) -> str:
+    if style_id in {"impact", "hype"}:
+        return r"{\fscx118\fscy118\t(0,180,\fscx100\fscy100)}" + text
+    if style_id == "question":
+        return r"{\fad(80,40)}" + text
+    if style_id == "warning":
+        return r"{\bord3}" + text
+    return text
+
+def _write_clip_ass(ass_path: str, segments: List[Dict], clip_start: float, clip_end: float, max_words: int, font_size: int, process_id: Optional[str] = None, thought_callback=None, clip_index: int = 0) -> bool:
     clip_entries: List[Dict] = []
     for seg in segments:
         overlap_start = max(clip_start, seg["start"])
@@ -258,11 +279,28 @@ def _write_clip_ass(ass_path: str, segments: List[Dict], clip_start: float, clip
                 clip_entries.append({
                     "start": chunk_start,
                     "end": chunk_end,
-                    "text": _highlight_caption_words(chunk, highlight_words),
+                    "text": chunk,
+                    "style": _choose_caption_style(chunk),
                 })
 
     if not clip_entries:
         return False
+
+    mode = (settings.CAPTION_STYLE_MODE or "hybrid").strip().lower()
+    ai_limit = max(0, settings.CAPTION_STYLE_AI_MAX_CUES)
+    if mode in {"ai", "hybrid"} and ai_limit > 0:
+        ai_indexes = [
+            idx for idx, cue in enumerate(clip_entries)
+            if mode == "ai" or cue.get("style") == "neutral"
+        ][:ai_limit]
+        ai_texts = [clip_entries[idx]["text"] for idx in ai_indexes]
+        ai_styles = _infer_caption_styles_with_ai(ai_texts)
+        if ai_styles:
+            for idx, style in zip(ai_indexes, ai_styles):
+                if style in STYLE_IDS:
+                    clip_entries[idx]["style"] = style
+            if thought_callback:
+                thought_callback(process_id, f"Caption Engine: Animated subtitle styles updated by AI on clip {clip_index} ({len(ai_styles)} cues).")
 
     ass_lines = [
         "[Script Info]",
@@ -276,15 +314,22 @@ def _write_clip_ass(ass_path: str, segments: List[Dict], clip_start: float, clip
         "[V4+ Styles]",
         "Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,"
         "ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding",
-        f"Style: Caption,Arial,{font_size},&H00FFFFFF,&H0000FFFF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,2,0,2,40,40,56,1",
+        f"Style: CapNeutral,Arial,{font_size},&H00FFFFFF,&H0000FFFF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,2,0,2,40,40,56,1",
+        f"Style: CapImpact,Arial,{font_size + 2},&H00FFFFFF,&H0000FFFF,&H00132A53,&H80201010,1,0,0,0,100,100,0,0,1,2,0,2,40,40,56,1",
+        f"Style: CapQuestion,Arial,{font_size + 1},&H00FFD8D8,&H0000FFFF,&H003A2E71,&H80201010,1,0,0,0,100,100,0,0,1,2,0,2,40,40,56,1",
+        f"Style: CapMoney,Arial,{font_size + 2},&H00C8FFB7,&H0000FFFF,&H001B4A1A,&H80201010,1,0,0,0,100,100,0,0,1,2,0,2,40,40,56,1",
+        f"Style: CapWarning,Arial,{font_size + 2},&H00D9D2FF,&H0000FFFF,&H0025147A,&H80201010,1,0,0,0,100,100,0,0,1,2,0,2,40,40,56,1",
+        f"Style: CapHype,Arial,{font_size + 3},&H00B3F5FF,&H0000FFFF,&H000F3B73,&H80201010,1,0,0,0,100,100,0,0,1,2,0,2,40,40,56,1",
         "",
         "[Events]",
         "Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text",
     ]
 
     for entry in clip_entries:
+        style_id = entry.get("style", "neutral")
+        text = _ass_effect_text(style_id, entry["text"])
         ass_lines.append(
-            f"Dialogue: 0,{_seconds_to_ass(entry['start'])},{_seconds_to_ass(entry['end'])},Caption,,0,0,0,,{entry['text']}"
+            f"Dialogue: 0,{_seconds_to_ass(entry['start'])},{_seconds_to_ass(entry['end'])},{_ass_style_name(style_id)},,0,0,0,,{text}"
         )
 
     with open(ass_path, "w", encoding="utf-8") as f:
@@ -342,12 +387,10 @@ def _build_ffmpeg_command(video_path: str, start: float, duration: float, output
                 clip_start=start,
                 clip_end=start + duration,
                 max_words=max(3, settings.CLIP_SUBTITLE_MAX_WORDS),
-                highlight_words={
-                    w.strip().lower()
-                    for w in (settings.CLIP_CAPTION_HIGHLIGHT_WORDS or "").split(",")
-                    if w.strip()
-                },
                 font_size=max(26, settings.CLIP_CAPTION_FONT_SIZE),
+                process_id=process_id,
+                thought_callback=thought_callback,
+                clip_index=clip_index,
             )
         else:
             subtitle_written = _write_clip_srt(

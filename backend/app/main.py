@@ -8,6 +8,7 @@ import shutil
 import os
 import uuid
 import re
+import time
 from .core.config import settings
 from .core.transcriber import transcribe_video
 from .core.analyst import analyze_transcript
@@ -262,6 +263,14 @@ def add_thought(process_id: str, thought: str):
 def run_pipeline_sync(process_id: str, video_path: str):
     """Synchronous pipeline runner to allow thread-based background execution."""
     try:
+        pipeline_t0 = time.perf_counter()
+        timing = {
+            "transcription_seconds": 0.0,
+            "analysis_seconds": 0.0,
+            "cutting_seconds": 0.0,
+            "total_seconds": 0.0,
+        }
+
         def check_cancelled():
             if processing_results.get(process_id, {}).get("cancelled"):
                 raise Exception("Process cancelled by user")
@@ -275,9 +284,12 @@ def run_pipeline_sync(process_id: str, video_path: str):
         # Step 1: Transcription
         check_cancelled()
         add_thought(process_id, "Whisper.cpp Perception: Listening to the audio track to map out the narrative structure...")
+        t0 = time.perf_counter()
         
         # Pass add_thought as a callback
         transcript = transcribe_video(video_path, process_id, active_pids, thought_callback=add_thought)
+        timing["transcription_seconds"] = round(time.perf_counter() - t0, 2)
+        add_thought(process_id, f"Timing: Transcription finished in {timing['transcription_seconds']}s.")
         
         if not transcript:
             if not processing_results[process_id].get("cancelled"):
@@ -287,7 +299,10 @@ def run_pipeline_sync(process_id: str, video_path: str):
         # Step 2: AI Analysis
         check_cancelled()
         add_thought(process_id, "Semantic Analysis: Parsing transcript for 'scroll-stopper' moments...")
+        t0 = time.perf_counter()
         analysis = analyze_transcript(transcript, video_path)
+        timing["analysis_seconds"] = round(time.perf_counter() - t0, 2)
+        add_thought(process_id, f"Timing: AI analysis finished in {timing['analysis_seconds']}s.")
         
         if not analysis or "hooks" not in analysis:
             processing_results[process_id].update({"status": "error", "error": "AI Analysis failed to find hooks."})
@@ -310,7 +325,10 @@ def run_pipeline_sync(process_id: str, video_path: str):
             add_thought(process_id, f"Qwen Strategic Insight: {analysis['strategy_thought']}")
             
         add_thought(process_id, f"Editor Monologue: Found {len(analysis.get('hooks', []))} viral segments. Initiating surgical cuts.")
+        t0 = time.perf_counter()
         clips = cut_video(video_path, analysis["hooks"], process_id, active_pids, thought_callback=add_thought, transcript=transcript)
+        timing["cutting_seconds"] = round(time.perf_counter() - t0, 2)
+        add_thought(process_id, f"Timing: Clip rendering finished in {timing['cutting_seconds']}s.")
         
         if not clips:
              if not processing_results[process_id].get("cancelled"):
@@ -319,12 +337,14 @@ def run_pipeline_sync(process_id: str, video_path: str):
 
         # Success!
         check_cancelled()
+        timing["total_seconds"] = round(time.perf_counter() - pipeline_t0, 2)
         add_thought(process_id, "Pipeline complete. All clips processed and verified.")
         processing_results[process_id].update({
             "status": "completed",
             "transcript": transcript,
             "analysis": analysis,
-            "clips": clips
+            "clips": clips,
+            "timing": timing,
         })
         
     except Exception as e:
