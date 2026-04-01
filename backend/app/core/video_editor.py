@@ -92,7 +92,29 @@ def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active
             thought_callback(process_id, f"FFmpeg: Surgically extracting clip {i+1} ({start:.2f}s to {end:.2f}s | {duration:.2f}s)...")
         
         try:
-            cmd = ["ffmpeg", "-y", "-ss", str(start), "-i", video_path, "-t", str(duration), "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-c:a", "aac", "-b:a", "128k", output_path]
+            cmd = ["ffmpeg", "-y", "-ss", str(start), "-i", video_path, "-t", str(duration)]
+
+            if settings.CLIP_ENABLE_TRANSITIONS:
+                fade_len = max(0.05, min(settings.CLIP_FADE_SECONDS, max(0.05, duration / 3)))
+                fade_out_start = max(0.0, duration - fade_len)
+                vf_parts = [
+                    f"fade=t=in:st=0:d={fade_len}",
+                    f"fade=t=out:st={fade_out_start}:d={fade_len}",
+                ]
+                af_parts = [
+                    f"afade=t=in:st=0:d={fade_len}",
+                    f"afade=t=out:st={fade_out_start}:d={fade_len}",
+                ]
+
+                if settings.CLIP_ENABLE_SUBTLE_ZOOM:
+                    zoom_max = max(1.0, settings.CLIP_ZOOM_MAX)
+                    vf_parts.append(
+                        f"scale=iw*{zoom_max}:ih*{zoom_max},crop=iw/{zoom_max}:ih/{zoom_max}"
+                    )
+
+                cmd.extend(["-vf", ",".join(vf_parts), "-af", ",".join(af_parts)])
+
+            cmd.extend(["-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-c:a", "aac", "-b:a", "128k", output_path])
             process = subprocess.Popen(
                 cmd, 
                 stdout=subprocess.PIPE, 
