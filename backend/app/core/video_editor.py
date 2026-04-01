@@ -208,6 +208,92 @@ def _get_format_preset_filters() -> List[str]:
     preset = (settings.CLIP_FORMAT_PRESET or "source").strip().lower()
     return list(FORMAT_PRESET_FILTERS.get(preset, FORMAT_PRESET_FILTERS["source"]))
 
+def _build_ffmpeg_command(video_path: str, start: float, duration: float, output_path: str, subtitle_path: Optional[str], transcript_segments: List[Dict], process_id: str = None, thought_callback=None, clip_index: int = 0, enable_format: bool = True, enable_transitions: bool = True, enable_zoom: bool = True, enable_subtitles: bool = True, animated_captions: bool = True) -> List[str]:
+    cmd = ["ffmpeg", "-y", "-ss", str(start), "-i", video_path, "-t", str(duration)]
+    vf_parts = _get_format_preset_filters() if enable_format else []
+    af_parts = []
+
+    if enable_transitions and settings.CLIP_ENABLE_TRANSITIONS:
+        fade_len = max(0.05, min(settings.CLIP_FADE_SECONDS, max(0.05, duration / 3)))
+        fade_out_start = max(0.0, duration - fade_len)
+        vf_parts.extend([
+            f"fade=t=in:st=0:d={fade_len}",
+            f"fade=t=out:st={fade_out_start}:d={fade_len}",
+        ])
+        af_parts.extend([
+            f"afade=t=in:st=0:d={fade_len}",
+            f"afade=t=out:st={fade_out_start}:d={fade_len}",
+        ])
+
+    if enable_zoom and settings.CLIP_ENABLE_SUBTLE_ZOOM:
+        zoom_max = max(1.0, settings.CLIP_ZOOM_MAX)
+        vf_parts.append(
+            f"scale=iw*{zoom_max}:ih*{zoom_max},crop=iw/{zoom_max}:ih/{zoom_max}"
+        )
+
+    if enable_subtitles and settings.CLIP_ENABLE_SUBTITLES and transcript_segments and subtitle_path:
+        subtitle_written = False
+        if animated_captions and settings.CLIP_ENABLE_ANIMATED_CAPTIONS:
+            subtitle_written = _write_clip_ass(
+                subtitle_path,
+                transcript_segments,
+                clip_start=start,
+                clip_end=start + duration,
+                max_words=max(3, settings.CLIP_SUBTITLE_MAX_WORDS),
+                highlight_words={
+                    w.strip().lower()
+                    for w in (settings.CLIP_CAPTION_HIGHLIGHT_WORDS or "").split(",")
+                    if w.strip()
+                },
+                font_size=max(26, settings.CLIP_CAPTION_FONT_SIZE),
+            )
+        else:
+            subtitle_written = _write_clip_srt(
+                subtitle_path,
+                transcript_segments,
+                clip_start=start,
+                clip_end=start + duration,
+                max_words=max(3, settings.CLIP_SUBTITLE_MAX_WORDS),
+            )
+
+        if subtitle_written:
+            preset = SUBTITLE_PRESETS.get(settings.CLIP_SUBTITLE_PRESET, SUBTITLE_PRESETS["bold_center"])
+            escaped_sub_path = _escape_filter_path(subtitle_path)
+            if animated_captions and settings.CLIP_ENABLE_ANIMATED_CAPTIONS:
+                vf_parts.append(f"subtitles='{escaped_sub_path}'")
+            else:
+                vf_parts.append(f"subtitles='{escaped_sub_path}':force_style='{preset}'")
+            if thought_callback:
+                mode = "animated" if (animated_captions and settings.CLIP_ENABLE_ANIMATED_CAPTIONS) else "static"
+                thought_callback(process_id, f"Caption Engine: Burn-in subtitles enabled for clip {clip_index} ({mode} / {settings.CLIP_SUBTITLE_PRESET}).")
+
+    if vf_parts:
+        cmd.extend(["-vf", ",".join(vf_parts)])
+    if af_parts:
+        cmd.extend(["-af", ",".join(af_parts)])
+
+    cmd.extend(["-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-c:a", "aac", "-b:a", "128k", output_path])
+    return cmd
+
+def _run_ffmpeg_command(cmd: List[str], process_id: str = None, active_pids: dict = None) -> tuple[bool, str]:
+    process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        preexec_fn=os.setsid,
+    )
+    if process_id and active_pids is not None:
+        active_pids[process_id] = process.pid
+    output_lines = []
+    if process.stdout:
+        for line in process.stdout:
+            output_lines.append(line.rstrip())
+    process.wait()
+    if process_id and active_pids is not None:
+        active_pids.pop(process_id, None)
+    return process.returncode == 0, "\n".join(output_lines)
+
 def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active_pids: dict = None, thought_callback=None, transcript: Optional[str] = None) -> List[str]:
     """Cuts a video into clips with PID tracking and live streaming."""
     output_clips = []
@@ -276,84 +362,43 @@ def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active
             thought_callback(process_id, f"FFmpeg: Surgically extracting clip {i+1} ({start:.2f}s to {end:.2f}s | {duration:.2f}s)...")
         
         try:
-            cmd = ["ffmpeg", "-y", "-ss", str(start), "-i", video_path, "-t", str(duration)]
-            vf_parts = list(preset_filters)
-            af_parts = []
+            attempts = [
+                {"enable_format": True, "enable_transitions": True, "enable_zoom": True, "enable_subtitles": True, "animated_captions": True},
+                {"enable_format": True, "enable_transitions": True, "enable_zoom": True, "enable_subtitles": True, "animated_captions": False},
+                {"enable_format": True, "enable_transitions": True, "enable_zoom": True, "enable_subtitles": False, "animated_captions": False},
+                {"enable_format": False, "enable_transitions": False, "enable_zoom": False, "enable_subtitles": False, "animated_captions": False},
+            ]
 
-            if settings.CLIP_ENABLE_TRANSITIONS:
-                fade_len = max(0.05, min(settings.CLIP_FADE_SECONDS, max(0.05, duration / 3)))
-                fade_out_start = max(0.0, duration - fade_len)
-                vf_parts.extend([
-                    f"fade=t=in:st=0:d={fade_len}",
-                    f"fade=t=out:st={fade_out_start}:d={fade_len}",
-                ])
-                af_parts.extend([
-                    f"afade=t=in:st=0:d={fade_len}",
-                    f"afade=t=out:st={fade_out_start}:d={fade_len}",
-                ])
+            success = False
+            last_output = ""
+            for attempt_index, attempt in enumerate(attempts, start=1):
+                if thought_callback and attempt_index > 1:
+                    thought_callback(process_id, f"FFmpeg fallback {attempt_index}: simplifying render filters for clip {i+1}.")
 
-            if settings.CLIP_ENABLE_SUBTLE_ZOOM:
-                zoom_max = max(1.0, settings.CLIP_ZOOM_MAX)
-                vf_parts.append(
-                    f"scale=iw*{zoom_max}:ih*{zoom_max},crop=iw/{zoom_max}:ih/{zoom_max}"
+                cmd = _build_ffmpeg_command(
+                    video_path=video_path,
+                    start=start,
+                    duration=duration,
+                    output_path=output_path,
+                    subtitle_path=subtitle_path,
+                    transcript_segments=transcript_segments,
+                    process_id=process_id,
+                    thought_callback=thought_callback,
+                    clip_index=i + 1,
+                    enable_format=attempt["enable_format"],
+                    enable_transitions=attempt["enable_transitions"],
+                    enable_zoom=attempt["enable_zoom"],
+                    enable_subtitles=attempt["enable_subtitles"],
+                    animated_captions=attempt["animated_captions"],
                 )
 
-            if settings.CLIP_ENABLE_SUBTITLES and transcript_segments:
-                subtitle_written = False
-                if settings.CLIP_ENABLE_ANIMATED_CAPTIONS:
-                    subtitle_written = _write_clip_ass(
-                        subtitle_path,
-                        transcript_segments,
-                        clip_start=start,
-                        clip_end=end,
-                        max_words=max(3, settings.CLIP_SUBTITLE_MAX_WORDS),
-                        highlight_words=highlight_words,
-                        font_size=max(26, settings.CLIP_CAPTION_FONT_SIZE),
-                    )
-                else:
-                    subtitle_written = _write_clip_srt(
-                        subtitle_path,
-                        transcript_segments,
-                        clip_start=start,
-                        clip_end=end,
-                        max_words=max(3, settings.CLIP_SUBTITLE_MAX_WORDS),
-                    )
+                success, last_output = _run_ffmpeg_command(cmd, process_id=process_id, active_pids=active_pids)
+                if success:
+                    output_clips.append(output_name)
+                    break
 
-                if subtitle_written:
-                    preset = SUBTITLE_PRESETS.get(settings.CLIP_SUBTITLE_PRESET, SUBTITLE_PRESETS["bold_center"])
-                    escaped_sub_path = _escape_filter_path(subtitle_path)
-                    if settings.CLIP_ENABLE_ANIMATED_CAPTIONS:
-                        vf_parts.append(f"subtitles='{escaped_sub_path}'")
-                    else:
-                        vf_parts.append(f"subtitles='{escaped_sub_path}':force_style='{preset}'")
-                    if thought_callback:
-                        mode = "animated" if settings.CLIP_ENABLE_ANIMATED_CAPTIONS else "static"
-                        thought_callback(process_id, f"Caption Engine: Burn-in subtitles enabled for clip {i+1} ({mode} / {settings.CLIP_SUBTITLE_PRESET}).")
-
-            if vf_parts:
-                cmd.extend(["-vf", ",".join(vf_parts)])
-            if af_parts:
-                cmd.extend(["-af", ",".join(af_parts)])
-
-            cmd.extend(["-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-c:a", "aac", "-b:a", "128k", output_path])
-            process = subprocess.Popen(
-                cmd, 
-                stdout=subprocess.PIPE, 
-                stderr=subprocess.STDOUT, 
-                text=True,
-                preexec_fn=os.setsid
-            )
-            
-            if process_id and active_pids is not None:
-                active_pids[process_id] = process.pid
-                
-            # Read output if needed for progress
-            for line in process.stdout:
-                pass
-                
-            process.wait()
-            if process.returncode == 0:
-                output_clips.append(output_name)
+            if not success:
+                print(f"Error cutting clip {i+1}: ffmpeg failed after retries. Output:\n{last_output}")
         except Exception as e:
             print(f"Error cutting clip {i+1}: {str(e)}")
             
