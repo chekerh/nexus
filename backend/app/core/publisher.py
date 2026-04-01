@@ -2,6 +2,8 @@ import json
 import os
 from datetime import datetime, UTC
 from typing import Dict, List
+import httpx
+from .config import settings
 
 SUPPORTED_PLATFORMS = ["tiktok", "instagram", "youtube"]
 
@@ -54,6 +56,16 @@ def publish_clip(platform: str, account: Dict, video_path: str, title: str, desc
 
     account_name = account.get("account_name", "Unknown account")
 
+    if platform == "youtube":
+        youtube_result = _publish_to_youtube(account, video_path, title, description)
+        if youtube_result.get("status") == "published":
+            youtube_result.update({
+                "platform": platform,
+                "account_name": account_name,
+                "created_at": datetime.now(UTC).isoformat(),
+            })
+            return youtube_result
+
     return {
         "status": "manual_required",
         "platform": platform,
@@ -68,3 +80,124 @@ def publish_clip(platform: str, account: Dict, video_path: str, title: str, desc
         ),
         "created_at": datetime.now(UTC).isoformat(),
     }
+
+
+def _publish_to_youtube(account: Dict, video_path: str, title: str, description: str) -> Dict:
+    refresh_token = (account.get("oauth_refresh_token") or "").strip()
+    if not refresh_token:
+        return {
+            "status": "manual_required",
+            "reason": "Missing account refresh token",
+            "upload_url": MANUAL_UPLOAD_URL["youtube"],
+            "message": "Add a YouTube account with refresh token to enable direct publish.",
+        }
+
+    client_id = settings.YOUTUBE_CLIENT_ID.strip()
+    client_secret = settings.YOUTUBE_CLIENT_SECRET.strip()
+    if not client_id or not client_secret:
+        return {
+            "status": "manual_required",
+            "reason": "Missing YOUTUBE_CLIENT_ID/YOUTUBE_CLIENT_SECRET in .env",
+            "upload_url": MANUAL_UPLOAD_URL["youtube"],
+            "message": "Set YouTube OAuth client in .env to enable direct publish.",
+        }
+
+    token = _youtube_access_token(client_id, client_secret, refresh_token)
+    if not token:
+        return {
+            "status": "manual_required",
+            "reason": "Failed to exchange refresh token",
+            "upload_url": MANUAL_UPLOAD_URL["youtube"],
+            "message": "Refresh token invalid/expired, reconnect account.",
+        }
+
+    privacy_status = (account.get("youtube_privacy_status") or "private").strip().lower()
+    if privacy_status not in {"private", "unlisted", "public"}:
+        privacy_status = "private"
+
+    try:
+        video_id = _youtube_upload_video(
+            access_token=token,
+            video_path=video_path,
+            title=title,
+            description=description,
+            privacy_status=privacy_status,
+        )
+        if not video_id:
+            raise RuntimeError("Upload completed but no video ID returned.")
+
+        return {
+            "status": "published",
+            "video_id": video_id,
+            "video_url": f"https://www.youtube.com/watch?v={video_id}",
+            "privacy_status": privacy_status,
+            "message": "Video published to YouTube successfully.",
+        }
+    except Exception as e:
+        return {
+            "status": "manual_required",
+            "reason": f"YouTube upload failed: {e}",
+            "upload_url": MANUAL_UPLOAD_URL["youtube"],
+            "message": "Fallback to manual upload in YouTube Studio.",
+        }
+
+
+def _youtube_access_token(client_id: str, client_secret: str, refresh_token: str) -> str:
+    payload = {
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "refresh_token": refresh_token,
+        "grant_type": "refresh_token",
+    }
+    with httpx.Client(timeout=30) as client:
+        response = client.post("https://oauth2.googleapis.com/token", data=payload)
+        if response.status_code != 200:
+            return ""
+        data = response.json()
+        return data.get("access_token", "")
+
+
+def _youtube_upload_video(access_token: str, video_path: str, title: str, description: str, privacy_status: str) -> str:
+    init_url = "https://www.googleapis.com/upload/youtube/v3/videos?part=snippet,status&uploadType=resumable"
+    metadata = {
+        "snippet": {
+            "title": title[:100],
+            "description": description[:5000],
+            "categoryId": "22",
+        },
+        "status": {
+            "privacyStatus": privacy_status,
+            "selfDeclaredMadeForKids": False,
+        },
+    }
+
+    file_size = os.path.getsize(video_path)
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json; charset=UTF-8",
+        "X-Upload-Content-Type": "video/mp4",
+        "X-Upload-Content-Length": str(file_size),
+    }
+
+    with httpx.Client(timeout=None) as client:
+        init_resp = client.post(init_url, headers=headers, json=metadata)
+        if init_resp.status_code not in (200, 201):
+            raise RuntimeError(f"Init upload failed ({init_resp.status_code}): {init_resp.text}")
+
+        upload_url = init_resp.headers.get("Location", "")
+        if not upload_url:
+            raise RuntimeError("No resumable upload URL returned by YouTube API.")
+
+        with open(video_path, "rb") as f:
+            upload_headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "video/mp4",
+                "Content-Length": str(file_size),
+            }
+            upload_resp = client.put(upload_url, headers=upload_headers, content=f.read())
+
+        if upload_resp.status_code not in (200, 201):
+            raise RuntimeError(f"Upload failed ({upload_resp.status_code}): {upload_resp.text}")
+
+        body = upload_resp.json()
+        return body.get("id", "")

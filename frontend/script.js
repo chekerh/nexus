@@ -14,6 +14,8 @@ const addAccountBtn = document.getElementById('add-account-btn');
 const accountPlatform = document.getElementById('account-platform');
 const accountName = document.getElementById('account-name');
 const accountNotes = document.getElementById('account-notes');
+const accountRefreshToken = document.getElementById('account-refresh-token');
+const accountYoutubePrivacy = document.getElementById('account-youtube-privacy');
 const accountsList = document.getElementById('accounts-list');
 const publishConsole = document.getElementById('publish-console');
 
@@ -139,6 +141,7 @@ function renderAccountsList() {
             <div>
                 <strong>${acc.account_name}</strong>
                 <span class="account-tag">${acc.platform}</span>
+                ${acc.has_oauth_refresh_token ? '<span class="account-tag">api-ready</span>' : ''}
             </div>
             <button class="btn btn-danger account-delete-btn" data-account-id="${acc.id}">Delete</button>
         </div>
@@ -157,6 +160,8 @@ addAccountBtn.onclick = async () => {
     const platform = accountPlatform.value;
     const name = accountName.value.trim();
     const notes = accountNotes.value.trim();
+    const refreshToken = accountRefreshToken.value.trim();
+    const youtubePrivacyStatus = accountYoutubePrivacy.value;
 
     if (!name) return;
 
@@ -168,17 +173,31 @@ addAccountBtn.onclick = async () => {
                 platform,
                 account_name: name,
                 notes,
-                auth_mode: 'manual'
+                auth_mode: refreshToken ? 'oauth_refresh_token' : 'manual',
+                oauth_refresh_token: refreshToken,
+                youtube_privacy_status: youtubePrivacyStatus,
             })
         });
 
         accountName.value = '';
         accountNotes.value = '';
+        accountRefreshToken.value = '';
         await loadAccounts();
     } catch (err) {
         console.error('Failed to add account', err);
     }
 };
+
+function updateAccountCredentialInputs() {
+    const isYoutube = accountPlatform.value === 'youtube';
+    accountRefreshToken.disabled = !isYoutube;
+    accountYoutubePrivacy.disabled = !isYoutube;
+    if (!isYoutube) {
+        accountRefreshToken.value = '';
+    }
+}
+
+accountPlatform.onchange = updateAccountCredentialInputs;
 
 function accountOptionsForPlatform(platform) {
     const filtered = accountsCache.filter(a => a.platform === platform);
@@ -302,3 +321,4 @@ function showResults(data) {
 }
 
 loadAccounts();
+updateAccountCredentialInputs();

@@ -49,6 +49,12 @@
                     </select>
                     <input id="account-name" type="text" placeholder="Account name (e.g. @mybrand_main)">
                     <input id="account-notes" type="text" placeholder="Notes (optional)">
+                    <input id="account-refresh-token" type="password" placeholder="YouTube refresh token (optional for auto-publish)">
+                    <select id="account-youtube-privacy">
+                        <option value="private">YouTube privacy: private</option>
+                        <option value="unlisted">YouTube privacy: unlisted</option>
+                        <option value="public">YouTube privacy: public</option>
+                    </select>
                     <button class="btn btn-secondary" id="add-account-btn">Add Account</button>
                 </div>
                 <div id="accounts-list" class="accounts-list"></div>

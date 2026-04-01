@@ -42,6 +42,8 @@ class AccountCreate(BaseModel):
     account_name: str
     auth_mode: str = "manual"
     notes: str = ""
+    oauth_refresh_token: str = ""
+    youtube_privacy_status: str = "private"
 
 
 class PublishRequest(BaseModel):
@@ -50,6 +52,14 @@ class PublishRequest(BaseModel):
     clip_filename: str
     title: str
     description: str = ""
+
+
+def _sanitize_account(account: dict) -> dict:
+    copy = dict(account)
+    token = copy.get("oauth_refresh_token", "")
+    copy["has_oauth_refresh_token"] = bool(token)
+    copy.pop("oauth_refresh_token", None)
+    return copy
 
 @app.post("/process")
 async def process_video(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
@@ -110,7 +120,8 @@ async def list_platforms():
 async def list_accounts(platform: str | None = None):
     if platform and platform not in SUPPORTED_PLATFORMS:
         return JSONResponse(status_code=400, content={"error": "Unsupported platform"})
-    return {"accounts": account_store.list_accounts(platform)}
+    accounts = account_store.list_accounts(platform)
+    return {"accounts": [_sanitize_account(a) for a in accounts]}
 
 
 @app.post("/accounts")
@@ -124,9 +135,11 @@ async def create_account(payload: AccountCreate):
         "account_name": payload.account_name.strip(),
         "auth_mode": payload.auth_mode.strip() or "manual",
         "notes": payload.notes.strip(),
+        "oauth_refresh_token": payload.oauth_refresh_token.strip(),
+        "youtube_privacy_status": payload.youtube_privacy_status.strip() or "private",
         "created_at": datetime.now(UTC).isoformat(),
     })
-    return {"account": account}
+    return {"account": _sanitize_account(account)}
 
 
 @app.delete("/accounts/{account_id}")

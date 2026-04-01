@@ -53,6 +53,8 @@ class AccountStore:
                 "account_name": account["account_name"],
                 "auth_mode": account.get("auth_mode", "manual"),
                 "notes": account.get("notes", ""),
+                "oauth_refresh_token": account.get("oauth_refresh_token", ""),
+                "youtube_privacy_status": account.get("youtube_privacy_status", "private"),
                 "created_at": account.get("created_at"),
             }
             data.append(new_account)

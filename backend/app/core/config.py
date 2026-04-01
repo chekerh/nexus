@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     FRONTEND_DIR: str = str(BASE_DIR / "frontend")
     ACCOUNTS_DB_PATH: str = str(BASE_DIR / "backend" / "data" / "accounts.json")
     PUBLISH_LOG_PATH: str = str(BASE_DIR / "backend" / "data" / "publish_history.json")
+    YOUTUBE_CLIENT_ID: str = ""
+    YOUTUBE_CLIENT_SECRET: str = ""
     STRATEGIST_PROMPT_FILE: str = str(BASE_DIR / "prompts" / "strategist_system.md")
     VIRAL_SIGNALS_FILE: str = str(BASE_DIR / "prompts" / "viral_signals.md")
     CLIP_MIN_SECONDS: float = 12.0
