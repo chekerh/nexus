@@ -55,6 +55,8 @@ class AccountStore:
                 "notes": account.get("notes", ""),
                 "oauth_refresh_token": account.get("oauth_refresh_token", ""),
                 "youtube_privacy_status": account.get("youtube_privacy_status", "private"),
+                "instagram_user_id": account.get("instagram_user_id", ""),
+                "instagram_access_token": account.get("instagram_access_token", ""),
                 "created_at": account.get("created_at"),
             }
             data.append(new_account)

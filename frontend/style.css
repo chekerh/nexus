@@ -292,7 +292,7 @@ hr {
 
 .account-form-grid {
     display: grid;
-    grid-template-columns: 1fr 1.5fr 1.5fr 2fr 1.5fr 1fr;
+    grid-template-columns: 1fr 1.3fr 1.3fr 1.8fr 1.3fr 1.3fr 1.8fr 1fr;
     gap: 0.75rem;
     margin-bottom: 1rem;
 }

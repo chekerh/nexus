@@ -44,6 +44,8 @@ class AccountCreate(BaseModel):
     notes: str = ""
     oauth_refresh_token: str = ""
     youtube_privacy_status: str = "private"
+    instagram_user_id: str = ""
+    instagram_access_token: str = ""
 
 
 class PublishRequest(BaseModel):
@@ -57,8 +59,11 @@ class PublishRequest(BaseModel):
 def _sanitize_account(account: dict) -> dict:
     copy = dict(account)
     token = copy.get("oauth_refresh_token", "")
+    instagram_token = copy.get("instagram_access_token", "")
     copy["has_oauth_refresh_token"] = bool(token)
+    copy["has_instagram_access_token"] = bool(instagram_token)
     copy.pop("oauth_refresh_token", None)
+    copy.pop("instagram_access_token", None)
     return copy
 
 @app.post("/process")
@@ -137,6 +142,8 @@ async def create_account(payload: AccountCreate):
         "notes": payload.notes.strip(),
         "oauth_refresh_token": payload.oauth_refresh_token.strip(),
         "youtube_privacy_status": payload.youtube_privacy_status.strip() or "private",
+        "instagram_user_id": payload.instagram_user_id.strip(),
+        "instagram_access_token": payload.instagram_access_token.strip(),
         "created_at": datetime.now(UTC).isoformat(),
     })
     return {"account": _sanitize_account(account)}

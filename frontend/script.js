@@ -16,6 +16,8 @@ const accountName = document.getElementById('account-name');
 const accountNotes = document.getElementById('account-notes');
 const accountRefreshToken = document.getElementById('account-refresh-token');
 const accountYoutubePrivacy = document.getElementById('account-youtube-privacy');
+const accountInstagramUserId = document.getElementById('account-instagram-user-id');
+const accountInstagramToken = document.getElementById('account-instagram-token');
 const accountsList = document.getElementById('accounts-list');
 const publishConsole = document.getElementById('publish-console');
 
@@ -142,6 +144,7 @@ function renderAccountsList() {
                 <strong>${acc.account_name}</strong>
                 <span class="account-tag">${acc.platform}</span>
                 ${acc.has_oauth_refresh_token ? '<span class="account-tag">api-ready</span>' : ''}
+                ${acc.has_instagram_access_token ? '<span class="account-tag">ig-api-ready</span>' : ''}
             </div>
             <button class="btn btn-danger account-delete-btn" data-account-id="${acc.id}">Delete</button>
         </div>
@@ -162,6 +165,8 @@ addAccountBtn.onclick = async () => {
     const notes = accountNotes.value.trim();
     const refreshToken = accountRefreshToken.value.trim();
     const youtubePrivacyStatus = accountYoutubePrivacy.value;
+    const instagramUserId = accountInstagramUserId.value.trim();
+    const instagramAccessToken = accountInstagramToken.value.trim();
 
     if (!name) return;
 
@@ -173,15 +178,19 @@ addAccountBtn.onclick = async () => {
                 platform,
                 account_name: name,
                 notes,
-                auth_mode: refreshToken ? 'oauth_refresh_token' : 'manual',
+                auth_mode: refreshToken || instagramAccessToken ? 'api' : 'manual',
                 oauth_refresh_token: refreshToken,
                 youtube_privacy_status: youtubePrivacyStatus,
+                instagram_user_id: instagramUserId,
+                instagram_access_token: instagramAccessToken,
             })
         });
 
         accountName.value = '';
         accountNotes.value = '';
         accountRefreshToken.value = '';
+        accountInstagramUserId.value = '';
+        accountInstagramToken.value = '';
         await loadAccounts();
     } catch (err) {
         console.error('Failed to add account', err);
@@ -190,10 +199,17 @@ addAccountBtn.onclick = async () => {
 
 function updateAccountCredentialInputs() {
     const isYoutube = accountPlatform.value === 'youtube';
+    const isInstagram = accountPlatform.value === 'instagram';
     accountRefreshToken.disabled = !isYoutube;
     accountYoutubePrivacy.disabled = !isYoutube;
+    accountInstagramUserId.disabled = !isInstagram;
+    accountInstagramToken.disabled = !isInstagram;
     if (!isYoutube) {
         accountRefreshToken.value = '';
+    }
+    if (!isInstagram) {
+        accountInstagramUserId.value = '';
+        accountInstagramToken.value = '';
     }
 }
 

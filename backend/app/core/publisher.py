@@ -1,8 +1,10 @@
 import json
 import os
+import time
 from datetime import datetime, UTC
 from typing import Dict, List
 import httpx
+from urllib.parse import quote
 from .config import settings
 
 SUPPORTED_PLATFORMS = ["tiktok", "instagram", "youtube"]
@@ -66,6 +68,16 @@ def publish_clip(platform: str, account: Dict, video_path: str, title: str, desc
             })
             return youtube_result
 
+    if platform == "instagram":
+        instagram_result = _publish_to_instagram(account, video_path, title, description)
+        if instagram_result.get("status") == "published":
+            instagram_result.update({
+                "platform": platform,
+                "account_name": account_name,
+                "created_at": datetime.now(UTC).isoformat(),
+            })
+            return instagram_result
+
     return {
         "status": "manual_required",
         "platform": platform,
@@ -80,6 +92,110 @@ def publish_clip(platform: str, account: Dict, video_path: str, title: str, desc
         ),
         "created_at": datetime.now(UTC).isoformat(),
     }
+
+
+def _publish_to_instagram(account: Dict, video_path: str, title: str, description: str) -> Dict:
+    user_id = (account.get("instagram_user_id") or "").strip()
+    access_token = (account.get("instagram_access_token") or "").strip()
+    public_base = settings.PUBLIC_BASE_URL.strip().rstrip("/")
+    if not user_id or not access_token:
+        return {
+            "status": "manual_required",
+            "reason": "Missing instagram_user_id or instagram_access_token",
+            "upload_url": MANUAL_UPLOAD_URL["instagram"],
+            "message": "Add Instagram Business account credentials to enable direct publish.",
+        }
+
+    if not public_base:
+        return {
+            "status": "manual_required",
+            "reason": "Missing PUBLIC_BASE_URL",
+            "upload_url": MANUAL_UPLOAD_URL["instagram"],
+            "message": "Set PUBLIC_BASE_URL to a publicly reachable URL so Instagram can fetch clip media.",
+        }
+
+    clip_name = quote(os.path.basename(video_path))
+    video_url = f"{public_base}/video_clips/{clip_name}"
+    caption = f"{title}\n\n{description}".strip()
+    graph = f"https://graph.facebook.com/{settings.INSTAGRAM_GRAPH_VERSION}"
+
+    with httpx.Client(timeout=60) as client:
+        create_resp = client.post(
+            f"{graph}/{user_id}/media",
+            data={
+                "media_type": "REELS",
+                "video_url": video_url,
+                "caption": caption[:2200],
+                "access_token": access_token,
+            },
+        )
+        if create_resp.status_code not in (200, 201):
+            return {
+                "status": "manual_required",
+                "reason": f"Instagram container create failed ({create_resp.status_code}): {create_resp.text}",
+                "upload_url": MANUAL_UPLOAD_URL["instagram"],
+                "message": "Fallback to manual upload.",
+            }
+
+        creation_id = create_resp.json().get("id", "")
+        if not creation_id:
+            return {
+                "status": "manual_required",
+                "reason": "Instagram did not return creation container ID",
+                "upload_url": MANUAL_UPLOAD_URL["instagram"],
+                "message": "Fallback to manual upload.",
+            }
+
+        status = _wait_instagram_container_ready(client, graph, creation_id, access_token)
+        if status not in {"FINISHED", "PUBLISHED"}:
+            return {
+                "status": "manual_required",
+                "reason": f"Instagram media container not ready: {status}",
+                "upload_url": MANUAL_UPLOAD_URL["instagram"],
+                "message": "Fallback to manual upload.",
+            }
+
+        publish_resp = client.post(
+            f"{graph}/{user_id}/media_publish",
+            data={
+                "creation_id": creation_id,
+                "access_token": access_token,
+            },
+        )
+        if publish_resp.status_code not in (200, 201):
+            return {
+                "status": "manual_required",
+                "reason": f"Instagram publish failed ({publish_resp.status_code}): {publish_resp.text}",
+                "upload_url": MANUAL_UPLOAD_URL["instagram"],
+                "message": "Fallback to manual upload.",
+            }
+
+        media_id = publish_resp.json().get("id", "")
+        return {
+            "status": "published",
+            "media_id": media_id,
+            "video_url": f"https://www.instagram.com/reel/{media_id}/" if media_id else None,
+            "message": "Reel published to Instagram successfully.",
+        }
+
+
+def _wait_instagram_container_ready(client: httpx.Client, graph_base: str, creation_id: str, access_token: str) -> str:
+    # Small bounded polling loop.
+    for _ in range(10):
+        resp = client.get(
+            f"{graph_base}/{creation_id}",
+            params={
+                "fields": "status_code",
+                "access_token": access_token,
+            },
+        )
+        if resp.status_code != 200:
+            return "ERROR"
+        status = (resp.json().get("status_code") or "").upper()
+        if status in {"FINISHED", "PUBLISHED", "ERROR", "EXPIRED"}:
+            return status
+        time.sleep(2)
+    return "TIMEOUT"
 
 
 def _publish_to_youtube(account: Dict, video_path: str, title: str, description: str) -> Dict:
