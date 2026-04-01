@@ -153,7 +153,7 @@ def run_pipeline_sync(process_id: str, video_path: str):
         # Step 2: AI Analysis
         check_cancelled()
         add_thought(process_id, "Semantic Analysis: Parsing transcript for 'scroll-stopper' moments...")
-        analysis = analyze_transcript(transcript)
+        analysis = analyze_transcript(transcript, video_path)
         
         if not analysis or "hooks" not in analysis:
             processing_results[process_id].update({"status": "error", "error": "AI Analysis failed to find hooks."})

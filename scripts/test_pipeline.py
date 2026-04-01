@@ -28,7 +28,7 @@ def main():
     print(f"\n[TRANSCRIPT EXTRACT]\n{transcript[:200]}...\n")
 
     print("[2/2] Step: Viral Analysis (Ollama)...")
-    analysis = analyze_transcript(transcript)
+    analysis = analyze_transcript(transcript, args.file)
     if not analysis:
         print("Critical Error: AI Analysis failed.")
         sys.exit(1)
