@@ -21,8 +21,6 @@ def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active
     os.makedirs(clips_dir, exist_ok=True)
 
     for i, hook in enumerate(hooks):
-        if active_pids is not None and process_id not in active_pids and process_id is not None:
-             break
 
         start, end = hook.get('start', 0), hook.get('end', 0)
         duration = end - start

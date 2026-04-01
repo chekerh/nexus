@@ -1,6 +1,7 @@
 fastapi
 uvicorn
 pydantic-settings
+python-multipart
 httpx
 ollama
 ffmpeg-python
