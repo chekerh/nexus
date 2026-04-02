@@ -22,6 +22,13 @@ OLLAMA_MODEL="${OLLAMA_MODEL:-qwen2.5:7b}"
 OLLAMA_FALLBACK_MODEL="${OLLAMA_FALLBACK_MODEL:-qwen2.5:3b}"
 DEV_RELOAD="${DEV_RELOAD:-false}"
 
+dev_reload_enabled() {
+  case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
+    true|1|yes|on) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 model_exists_local() {
   local model="$1"
   if [[ -z "$model" ]]; then
@@ -111,7 +118,7 @@ trap cleanup EXIT INT TERM
 
 # 6) Start app
 echo "Starting Nexus-UGC on http://127.0.0.1:8000"
-if [[ "${DEV_RELOAD,,}" == "true" ]]; then
+if dev_reload_enabled "$DEV_RELOAD"; then
   exec uvicorn backend.app.main:app --reload --port 8000
 else
   exec uvicorn backend.app.main:app --port 8000
