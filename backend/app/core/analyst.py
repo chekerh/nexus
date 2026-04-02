@@ -2,10 +2,10 @@ import ollama
 import json
 import re
 import subprocess
-import importlib
 from pathlib import Path
 from typing import Optional, List, Dict, Tuple
 from .config import settings
+from .airllm_service import airllm_service
 
 TIMESTAMP_RE = re.compile(
     r'^\[(\d{2}:\d{2}:\d{2}\.\d{3})\s+-->\s+(\d{2}:\d{2}:\d{2}\.\d{3})\]\s+(.*)$'
@@ -33,8 +33,6 @@ VIRAL_KEYWORDS = {
 }
 
 MIN_SCENE_SCORE = 0.35
-_AIRLLM_MODEL = None
-_AIRLLM_MODEL_ID = ""
 
 def _to_float(value, default: float = 0.0) -> float:
     try:
@@ -366,54 +364,12 @@ def _chat_with_ollama(system_prompt: str, user_payload: str, analyst_model: str)
 
 def _chat_with_airllm(system_prompt: str, user_payload: str) -> Optional[str]:
     """Experimental AirLLM path. Returns None on any failure so caller can fallback."""
-    global _AIRLLM_MODEL, _AIRLLM_MODEL_ID
-
-    if importlib.util.find_spec("airllm") is None:
-        return None
-
-    try:
-        from airllm import AutoModel
-        model_id = (settings.AIRLLM_MODEL_ID or "Qwen/Qwen2.5-3B-Instruct").strip()
-        compression = (settings.AIRLLM_COMPRESSION or "").strip() or None
-
-        if _AIRLLM_MODEL is None or _AIRLLM_MODEL_ID != model_id:
-            kwargs = {}
-            if compression:
-                kwargs["compression"] = compression
-            _AIRLLM_MODEL = AutoModel.from_pretrained(model_id, **kwargs)
-            _AIRLLM_MODEL_ID = model_id
-
-        prompt = f"{system_prompt}\n\n{user_payload}"
-        max_ctx = max(512, settings.OLLAMA_NUM_CTX)
-        input_tokens = _AIRLLM_MODEL.tokenizer(
-            [prompt],
-            return_tensors="pt",
-            return_attention_mask=False,
-            truncation=True,
-            max_length=max_ctx,
-            padding=False,
-        )
-
-        input_ids = input_tokens["input_ids"]
-        # Best-effort device placement.
-        try:
-            import torch
-            if torch.cuda.is_available():
-                input_ids = input_ids.cuda()
-            elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
-                input_ids = input_ids.to("mps")
-        except Exception:
-            pass
-
-        generation_output = _AIRLLM_MODEL.generate(
-            input_ids,
-            max_new_tokens=max(200, settings.OLLAMA_NUM_PREDICT),
-            use_cache=True,
-            return_dict_in_generate=True,
-        )
-        return _AIRLLM_MODEL.tokenizer.decode(generation_output.sequences[0])
-    except Exception:
-        return None
+    prompt = f"{system_prompt}\n\n{user_payload}"
+    return airllm_service.generate(
+        prompt=prompt,
+        max_length=max(512, settings.OLLAMA_NUM_CTX),
+        max_new_tokens=max(200, settings.OLLAMA_NUM_PREDICT),
+    )
 
 def _snap_hooks_to_candidates(hooks: List[Dict], candidates: List[Dict]) -> List[Dict]:
     if not hooks or not candidates:

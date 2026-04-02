@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     ANALYSIS_BACKEND: str = "ollama"  # ollama | airllm
     AIRLLM_MODEL_ID: str = "Qwen/Qwen2.5-3B-Instruct"
     AIRLLM_COMPRESSION: str = "4bit"
+    AIRLLM_WARM_ON_START: bool = True
     OLLAMA_NUM_CTX: int = 4096
     OLLAMA_NUM_PREDICT: int = 700
     OLLAMA_STYLE_NUM_CTX: int = 1024

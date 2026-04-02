@@ -15,6 +15,7 @@ from .core.analyst import analyze_transcript
 from .core.video_editor import cut_video
 from .core.account_store import AccountStore
 from .core.publisher import publish_clip, PublishHistoryStore, SUPPORTED_PLATFORMS
+from .core.airllm_service import airllm_service
 
 app = FastAPI(title="Nexus-UGC Dashboard")
 
@@ -36,6 +37,15 @@ processing_results = {}
 active_pids = {} # {process_id: pid}
 account_store = AccountStore(settings.ACCOUNTS_DB_PATH)
 publish_history_store = PublishHistoryStore(settings.PUBLISH_LOG_PATH)
+
+
+@app.on_event("startup")
+async def warm_models_on_startup():
+    backend = (settings.ANALYSIS_BACKEND or "ollama").strip().lower()
+    if backend == "airllm" and settings.AIRLLM_WARM_ON_START:
+        ok, message = airllm_service.ensure_loaded()
+        status = "ready" if ok else "fallback-to-ollama"
+        print(f"[startup] airllm warmup: {status} | {message}")
 
 
 class AccountCreate(BaseModel):
