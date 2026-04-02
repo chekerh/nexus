@@ -37,6 +37,7 @@ STYLE_KEYWORDS = {
 }
 
 STYLE_IDS = ["neutral", "impact", "question", "money", "warning", "hype"]
+STYLE_ROTATION = ["impact", "question", "money", "warning", "hype", "neutral"]
 
 _FFMPEG_FILTER_CACHE: Optional[set[str]] = None
 
@@ -172,6 +173,11 @@ def _infer_caption_styles_with_ai(texts: List[str]) -> List[str]:
                 {"role": "user", "content": user},
             ],
             keep_alive=settings.OLLAMA_KEEP_ALIVE,
+            options={
+                "temperature": 0.1,
+                "num_ctx": max(512, settings.OLLAMA_STYLE_NUM_CTX),
+                "num_predict": max(32, settings.OLLAMA_STYLE_NUM_PREDICT),
+            },
         )
         content = (response.get("message", {}) or {}).get("content", "").strip()
         match = re.search(r"\{[\s\S]*\}", content)
@@ -259,6 +265,66 @@ def _ass_effect_text(style_id: str, text: str) -> str:
         return r"{\bord3}" + text
     return text
 
+def _pick_alternate_style(current: str, cue_text: str, position: int) -> str:
+    text = (cue_text or "").lower()
+    if "?" in cue_text:
+        return "question"
+    if any(k in text for k in STYLE_KEYWORDS["money"]):
+        return "money"
+    if any(k in text for k in STYLE_KEYWORDS["warning"]):
+        return "warning"
+    for i in range(len(STYLE_ROTATION)):
+        candidate = STYLE_ROTATION[(position + i) % len(STYLE_ROTATION)]
+        if candidate != current:
+            return candidate
+    return "neutral"
+
+def _diversify_style_sequence(entries: List[Dict], min_variety: int) -> None:
+    if not entries:
+        return
+
+    # Break long streaks of same style.
+    streak_style = None
+    streak = 0
+    for i, entry in enumerate(entries):
+        style = entry.get("style", "neutral")
+        if style == streak_style:
+            streak += 1
+        else:
+            streak_style = style
+            streak = 1
+        if streak >= 3:
+            entry["style"] = _pick_alternate_style(style, entry.get("text", ""), i)
+            streak_style = entry["style"]
+            streak = 1
+
+    # Ensure minimum global variety so captions don't feel static.
+    unique_styles = {e.get("style", "neutral") for e in entries}
+    target = max(1, min(6, min_variety))
+    if len(unique_styles) >= target:
+        return
+
+    needed = target - len(unique_styles)
+    idx = 0
+    while needed > 0 and idx < len(entries):
+        cur = entries[idx].get("style", "neutral")
+        alt = _pick_alternate_style(cur, entries[idx].get("text", ""), idx)
+        if alt not in unique_styles:
+            entries[idx]["style"] = alt
+            unique_styles.add(alt)
+            needed -= 1
+        idx += 2
+
+def _assign_visual_variants(entries: List[Dict]) -> None:
+    for i, entry in enumerate(entries):
+        style = entry.get("style", "neutral")
+        variant_base = 1 + (i % 4)
+        if style == "warning":
+            variant_base = 4 if i % 2 == 0 else 2
+        elif style == "money":
+            variant_base = 3 if i % 2 == 0 else 1
+        entry["variant"] = variant_base
+
 def _write_clip_ass(ass_path: str, segments: List[Dict], clip_start: float, clip_end: float, max_words: int, font_size: int, process_id: Optional[str] = None, thought_callback=None, clip_index: int = 0) -> bool:
     clip_entries: List[Dict] = []
     for seg in segments:
@@ -301,6 +367,12 @@ def _write_clip_ass(ass_path: str, segments: List[Dict], clip_start: float, clip
                     clip_entries[idx]["style"] = style
             if thought_callback:
                 thought_callback(process_id, f"Caption Engine: Animated subtitle styles updated by AI on clip {clip_index} ({len(ai_styles)} cues).")
+
+    _diversify_style_sequence(clip_entries, settings.CAPTION_STYLE_MIN_VARIETY)
+    _assign_visual_variants(clip_entries)
+    if thought_callback and clip_entries:
+        unique_styles = len({c.get("style", "neutral") for c in clip_entries})
+        thought_callback(process_id, f"Caption Engine: Clip {clip_index} animated styles diversified ({unique_styles} style groups).")
 
     ass_lines = [
         "[Script Info]",
@@ -529,6 +601,12 @@ def _write_clip_cues_json(cues_path: str, segments: List[Dict], clip_start: floa
                     cues[idx]["style"] = style
             if thought_callback:
                 thought_callback(process_id, f"Caption Engine: AI style pass applied on clip {clip_index} ({len(ai_styles)} cues, mode={mode}, model={_choose_style_model()}).")
+
+    _diversify_style_sequence(cues, settings.CAPTION_STYLE_MIN_VARIETY)
+    _assign_visual_variants(cues)
+    if thought_callback and cues:
+        unique_styles = len({c.get("style", "neutral") for c in cues})
+        thought_callback(process_id, f"Caption Engine: Clip {clip_index} overlay styles diversified ({unique_styles} style groups).")
 
     payload = {
         "styles": CAPTION_STYLES,

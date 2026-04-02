@@ -12,6 +12,15 @@ class Settings(BaseSettings):
     OLLAMA_ANALYST_MODEL: str = ""
     OLLAMA_STYLE_MODEL: str = "qwen2.5:3b"
     OLLAMA_KEEP_ALIVE: str = "3m"
+    ANALYSIS_BACKEND: str = "ollama"  # ollama | airllm
+    AIRLLM_MODEL_ID: str = "Qwen/Qwen2.5-3B-Instruct"
+    AIRLLM_COMPRESSION: str = "4bit"
+    OLLAMA_NUM_CTX: int = 4096
+    OLLAMA_NUM_PREDICT: int = 700
+    OLLAMA_STYLE_NUM_CTX: int = 1024
+    OLLAMA_STYLE_NUM_PREDICT: int = 120
+    ANALYSIS_TRANSCRIPT_MAX_CHARS: int = 9000
+    ANALYSIS_MAX_CANDIDATES: int = 8
     WHISPER_THREADS: int = 4
     WHISPER_PROCESSORS: int = 1
     WHISPER_LANGUAGE: str = "en"
@@ -45,6 +54,7 @@ class Settings(BaseSettings):
     VIDEO_THREADS: int = 2
     CAPTION_STYLE_MODE: str = "hybrid"  # rule | ai | hybrid
     CAPTION_STYLE_AI_MAX_CUES: int = 60
+    CAPTION_STYLE_MIN_VARIETY: int = 3
     STRATEGIST_PROMPT_FILE: str = str(BASE_DIR / "prompts" / "strategist_system.md")
     VIRAL_SIGNALS_FILE: str = str(BASE_DIR / "prompts" / "viral_signals.md")
     CLIP_MIN_SECONDS: float = 12.0
