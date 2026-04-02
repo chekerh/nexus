@@ -16,7 +16,56 @@ pip install -r requirements.txt >/dev/null
 OLLAMA_MODEL="$(grep -E '^OLLAMA_MODEL=' .env 2>/dev/null | head -n1 | cut -d'=' -f2- || true)"
 OLLAMA_ANALYST_MODEL="$(grep -E '^OLLAMA_ANALYST_MODEL=' .env 2>/dev/null | head -n1 | cut -d'=' -f2- || true)"
 OLLAMA_STYLE_MODEL="$(grep -E '^OLLAMA_STYLE_MODEL=' .env 2>/dev/null | head -n1 | cut -d'=' -f2- || true)"
+OLLAMA_FALLBACK_MODEL="$(grep -E '^OLLAMA_FALLBACK_MODEL=' .env 2>/dev/null | head -n1 | cut -d'=' -f2- || true)"
+DEV_RELOAD="$(grep -E '^DEV_RELOAD=' .env 2>/dev/null | head -n1 | cut -d'=' -f2- || true)"
 OLLAMA_MODEL="${OLLAMA_MODEL:-qwen2.5:7b}"
+OLLAMA_FALLBACK_MODEL="${OLLAMA_FALLBACK_MODEL:-qwen2.5:3b}"
+DEV_RELOAD="${DEV_RELOAD:-false}"
+
+model_exists_local() {
+  local model="$1"
+  if [[ -z "$model" ]]; then
+    return 1
+  fi
+  ollama list 2>/dev/null | awk 'NR>1 {print $1}' | grep -Fxq "$model"
+}
+
+ensure_model_available() {
+  local model="$1"
+  local required="$2"
+
+  if [[ -z "$model" ]]; then
+    return 0
+  fi
+
+  if model_exists_local "$model"; then
+    echo "Model '$model' already local."
+    return 0
+  fi
+
+  echo "Ensuring model '$model' is available..."
+  local attempts=3
+  local ok=0
+  for ((i=1; i<=attempts; i++)); do
+    if ollama pull "$model" >/dev/null; then
+      ok=1
+      break
+    fi
+    echo "Pull attempt $i/$attempts failed for '$model'. Retrying..."
+    sleep 2
+  done
+
+  if [[ "$ok" -eq 1 ]] || model_exists_local "$model"; then
+    return 0
+  fi
+
+  if [[ "$required" == "required" ]]; then
+    return 1
+  fi
+
+  echo "Warning: optional model '$model' unavailable. Continuing."
+  return 0
+}
 
 # 3) Start Ollama only if not already running
 if ! curl -sSf http://127.0.0.1:11434/api/tags >/dev/null 2>&1; then
@@ -28,18 +77,28 @@ else
   OLLAMA_PID=""
 fi
 
-# 4) Ensure model is available
-echo "Ensuring model '$OLLAMA_MODEL' is available..."
-ollama pull "$OLLAMA_MODEL" >/dev/null
+# 4) Ensure models are available (with retry + fallback)
+if ! ensure_model_available "$OLLAMA_MODEL" required; then
+  echo "Warning: primary model '$OLLAMA_MODEL' unavailable. Trying fallback '$OLLAMA_FALLBACK_MODEL'..."
+  if ensure_model_available "$OLLAMA_FALLBACK_MODEL" required; then
+    export OLLAMA_MODEL="$OLLAMA_FALLBACK_MODEL"
+    if [[ -z "${OLLAMA_ANALYST_MODEL:-}" ]]; then
+      export OLLAMA_ANALYST_MODEL="$OLLAMA_FALLBACK_MODEL"
+    fi
+    echo "Using fallback model '$OLLAMA_FALLBACK_MODEL' for this run."
+  else
+    echo "Error: could not pull primary or fallback model."
+    echo "Tip: set a smaller local model in .env (e.g. OLLAMA_MODEL=qwen2.5:3b)."
+    exit 1
+  fi
+fi
 
 if [[ -n "${OLLAMA_ANALYST_MODEL:-}" ]]; then
-  echo "Ensuring analyst model '$OLLAMA_ANALYST_MODEL' is available..."
-  ollama pull "$OLLAMA_ANALYST_MODEL" >/dev/null
+  ensure_model_available "$OLLAMA_ANALYST_MODEL" optional || true
 fi
 
 if [[ -n "${OLLAMA_STYLE_MODEL:-}" ]]; then
-  echo "Ensuring style model '$OLLAMA_STYLE_MODEL' is available..."
-  ollama pull "$OLLAMA_STYLE_MODEL" >/dev/null
+  ensure_model_available "$OLLAMA_STYLE_MODEL" optional || true
 fi
 
 # 5) Cleanup background ollama if this script started it
@@ -52,4 +111,8 @@ trap cleanup EXIT INT TERM
 
 # 6) Start app
 echo "Starting Nexus-UGC on http://127.0.0.1:8000"
-exec uvicorn backend.app.main:app --reload --port 8000
+if [[ "${DEV_RELOAD,,}" == "true" ]]; then
+  exec uvicorn backend.app.main:app --reload --port 8000
+else
+  exec uvicorn backend.app.main:app --port 8000
+fi
