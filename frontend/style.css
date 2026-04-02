@@ -79,6 +79,20 @@ body {
     padding: 1rem;
 }
 
+.sidebar-runtime {
+    margin-top: 1rem;
+    padding: 1rem;
+}
+
+.sidebar-runtime h3 {
+    color: var(--primary);
+    margin-bottom: .5rem;
+}
+
+.sidebar-runtime .btn {
+    margin-top: .45rem;
+}
+
 .sidebar-accounts .account-form-grid {
     grid-template-columns: 1fr;
 }

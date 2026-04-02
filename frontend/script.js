@@ -12,6 +12,8 @@ const navPipeline = document.getElementById('nav-pipeline');
 const navAccounts = document.getElementById('nav-accounts');
 const sidebarAccountsPanel = document.getElementById('sidebar-accounts-panel');
 const toastContainer = document.getElementById('toast-container');
+const unloadBackendBtn = document.getElementById('unload-backend-btn');
+const backendStatusLabel = document.getElementById('backend-status-label');
 
 const stopBtn = document.getElementById('stop-btn');
 const thinkingConsole = document.getElementById('thinking-console');
@@ -90,6 +92,23 @@ function showClipReadyNotification(processId, clipCount) {
         Notification.requestPermission().then(p => {
             if (p === 'granted') fire();
         });
+    }
+}
+
+async function refreshBackendRuntimeStatus() {
+    if (!backendStatusLabel) return;
+    try {
+        const res = await fetch('/ai/backend/status');
+        const data = await res.json();
+        const backend = data.backend || 'ollama';
+        if (backend === 'airllm') {
+            const loaded = !!data?.airllm?.loaded;
+            backendStatusLabel.innerText = `Backend: airllm (${loaded ? 'loaded' : 'idle'})`;
+        } else {
+            backendStatusLabel.innerText = `Backend: ${backend}`;
+        }
+    } catch {
+        backendStatusLabel.innerText = 'Backend: unavailable';
     }
 }
 
@@ -518,6 +537,7 @@ function showResults(data, processId) {
     if (data?.timing?.total_seconds) {
         showToast('Pipeline complete', `Process ${String(processId || '').slice(-6).toUpperCase()} finished in ${data.timing.total_seconds}s`);
     }
+    refreshBackendRuntimeStatus();
 }
 
 navPipeline.onclick = (e) => {
@@ -530,6 +550,20 @@ navAccounts.onclick = (e) => {
     setSidebarView('accounts');
 };
 
+if (unloadBackendBtn) {
+    unloadBackendBtn.onclick = async () => {
+        try {
+            const res = await fetch('/ai/backend/unload', { method: 'POST' });
+            const data = await res.json();
+            showToast('Runtime memory', data.message || 'Unload request completed');
+            await refreshBackendRuntimeStatus();
+        } catch (err) {
+            showToast('Runtime memory', `Unload failed: ${err}`);
+        }
+    };
+}
+
 loadAccounts();
 updateAccountCredentialInputs();
 setSidebarView('pipeline');
+refreshBackendRuntimeStatus();

@@ -10,6 +10,7 @@ class AirLLMService:
         self._lock = threading.Lock()
         self._model = None
         self._model_id = ""
+        self._last_error = ""
 
     def is_available(self) -> bool:
         return importlib.util.find_spec("airllm") is not None
@@ -35,11 +36,47 @@ class AirLLMService:
 
                 self._model = AutoModel.from_pretrained(model_id, **kwargs)
                 self._model_id = model_id
+                self._last_error = ""
                 return True, f"airllm model loaded ({self._model_id}, compression={compression or 'none'})"
             except Exception as e:
                 self._model = None
                 self._model_id = ""
+                self._last_error = str(e)
                 return False, f"airllm load failed: {e}"
+
+    def unload(self) -> Tuple[bool, str]:
+        with self._lock:
+            if self._model is None:
+                return True, "airllm model already unloaded"
+            try:
+                self._model = None
+                self._model_id = ""
+                try:
+                    import gc
+                    gc.collect()
+                except Exception:
+                    pass
+                try:
+                    import torch
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                    elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+                        # Best effort on Apple Silicon.
+                        torch.mps.empty_cache()
+                except Exception:
+                    pass
+                return True, "airllm model unloaded"
+            except Exception as e:
+                return False, f"airllm unload failed: {e}"
+
+    def status(self) -> dict:
+        return {
+            "installed": self.is_available(),
+            "loaded": self._model is not None,
+            "model_id": self._model_id,
+            "last_error": self._last_error,
+            "compression": (settings.AIRLLM_COMPRESSION or "").strip() or "none",
+        }
 
     def generate(self, prompt: str, max_length: int, max_new_tokens: int) -> Optional[str]:
         ok, _ = self.ensure_loaded()

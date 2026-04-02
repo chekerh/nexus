@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     OLLAMA_STYLE_MODEL: str = "qwen2.5:0.5b"
     OLLAMA_KEEP_ALIVE: str = "3m"
     ANALYSIS_BACKEND: str = "ollama"  # ollama | airllm
+    ANALYSIS_AUTO_UNLOAD_AFTER_PROCESS: bool = False
     AIRLLM_MODEL_ID: str = "Qwen/Qwen2.5-3B-Instruct"
     AIRLLM_COMPRESSION: str = "4bit"
     AIRLLM_WARM_ON_START: bool = True
