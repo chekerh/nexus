@@ -312,7 +312,7 @@ def run_pipeline_sync(process_id: str, video_path: str):
         if meta:
             add_thought(
                 process_id,
-                f"Selection Engine: {meta.get('candidate_count', 0)} candidates ranked, {meta.get('scene_cut_count', 0)} scene boundaries used, model={meta.get('model', 'n/a')}."
+                f"Selection Engine: {meta.get('candidate_count', 0)} candidates ranked, {meta.get('scene_cut_count', 0)} scene boundaries used, backend={meta.get('backend', 'ollama')}, model={meta.get('model', 'n/a')}."
             )
             add_thought(
                 process_id,

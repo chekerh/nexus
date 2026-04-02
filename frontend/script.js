@@ -413,6 +413,20 @@ async function bindStyledCaptionOverlays(clips) {
         }
 
         const cues = cuesPayload.cues;
+        const variantPalette = {
+            1: { color: '#ffffff', bg: 'rgba(0,0,0,.62)', shadow: '0 8px 20px rgba(0,0,0,.35)' },
+            2: { color: '#d7e7ff', bg: 'rgba(37,45,112,.78)', shadow: '0 10px 24px rgba(54,74,220,.28)' },
+            3: { color: '#c7ffd3', bg: 'rgba(9,72,34,.82)', shadow: '0 10px 24px rgba(65,190,86,.28)' },
+            4: { color: '#ffd6dc', bg: 'rgba(116,20,46,.84)', shadow: '0 10px 24px rgba(238,86,117,.28)' }
+        };
+        const styleAnim = {
+            neutral: 'none',
+            impact: 'cap-pop .25s ease-out',
+            question: 'cap-float .55s ease-in-out',
+            money: 'cap-glow 1.2s ease-in-out infinite',
+            warning: 'cap-shake .3s ease-in-out',
+            hype: 'cap-pop .3s ease-out'
+        };
         const updateOverlay = () => {
             const t = video.currentTime || 0;
             const active = cues.find(c => t >= c.start && t <= c.end);
@@ -422,7 +436,17 @@ async function bindStyledCaptionOverlays(clips) {
                 return;
             }
             overlay.innerHTML = `<span>${active.text}</span>`;
-            overlay.className = `caption-overlay ${(active.style ? `cap-${active.style}` : 'cap-neutral')}`;
+            const styleClass = active.style ? `cap-${active.style}` : 'cap-neutral';
+            const variantClass = active.variant ? `cap-v${active.variant}` : 'cap-v1';
+            overlay.className = `caption-overlay ${styleClass} ${variantClass}`;
+            const span = overlay.querySelector('span');
+            if (span) {
+                const palette = variantPalette[active.variant] || variantPalette[1];
+                span.style.color = palette.color;
+                span.style.background = palette.bg;
+                span.style.boxShadow = palette.shadow;
+                span.style.animation = styleAnim[active.style] || 'none';
+            }
         };
 
         video.addEventListener('timeupdate', updateOverlay);

@@ -2,6 +2,7 @@ import ollama
 import json
 import re
 import subprocess
+import importlib
 from pathlib import Path
 from typing import Optional, List, Dict, Tuple
 from .config import settings
@@ -32,6 +33,8 @@ VIRAL_KEYWORDS = {
 }
 
 MIN_SCENE_SCORE = 0.35
+_AIRLLM_MODEL = None
+_AIRLLM_MODEL_ID = ""
 
 def _to_float(value, default: float = 0.0) -> float:
     try:
@@ -345,6 +348,73 @@ def _extract_first_json_object(text: str) -> Optional[str]:
 
     return None
 
+def _chat_with_ollama(system_prompt: str, user_payload: str, analyst_model: str) -> str:
+    response = ollama.chat(
+        model=analyst_model,
+        messages=[
+            {'role': 'system', 'content': system_prompt},
+            {'role': 'user', 'content': user_payload},
+        ],
+        keep_alive=settings.OLLAMA_KEEP_ALIVE,
+        options={
+            "temperature": 0.2,
+            "num_ctx": max(1024, settings.OLLAMA_NUM_CTX),
+            "num_predict": max(200, settings.OLLAMA_NUM_PREDICT),
+        },
+    )
+    return response['message']['content'].strip()
+
+def _chat_with_airllm(system_prompt: str, user_payload: str) -> Optional[str]:
+    """Experimental AirLLM path. Returns None on any failure so caller can fallback."""
+    global _AIRLLM_MODEL, _AIRLLM_MODEL_ID
+
+    if importlib.util.find_spec("airllm") is None:
+        return None
+
+    try:
+        from airllm import AutoModel
+        model_id = (settings.AIRLLM_MODEL_ID or "Qwen/Qwen2.5-3B-Instruct").strip()
+        compression = (settings.AIRLLM_COMPRESSION or "").strip() or None
+
+        if _AIRLLM_MODEL is None or _AIRLLM_MODEL_ID != model_id:
+            kwargs = {}
+            if compression:
+                kwargs["compression"] = compression
+            _AIRLLM_MODEL = AutoModel.from_pretrained(model_id, **kwargs)
+            _AIRLLM_MODEL_ID = model_id
+
+        prompt = f"{system_prompt}\n\n{user_payload}"
+        max_ctx = max(512, settings.OLLAMA_NUM_CTX)
+        input_tokens = _AIRLLM_MODEL.tokenizer(
+            [prompt],
+            return_tensors="pt",
+            return_attention_mask=False,
+            truncation=True,
+            max_length=max_ctx,
+            padding=False,
+        )
+
+        input_ids = input_tokens["input_ids"]
+        # Best-effort device placement.
+        try:
+            import torch
+            if torch.cuda.is_available():
+                input_ids = input_ids.cuda()
+            elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+                input_ids = input_ids.to("mps")
+        except Exception:
+            pass
+
+        generation_output = _AIRLLM_MODEL.generate(
+            input_ids,
+            max_new_tokens=max(200, settings.OLLAMA_NUM_PREDICT),
+            use_cache=True,
+            return_dict_in_generate=True,
+        )
+        return _AIRLLM_MODEL.tokenizer.decode(generation_output.sequences[0])
+    except Exception:
+        return None
+
 def _snap_hooks_to_candidates(hooks: List[Dict], candidates: List[Dict]) -> List[Dict]:
     if not hooks or not candidates:
         return hooks
@@ -408,7 +478,7 @@ def analyze_transcript(transcript: str, video_path: Optional[str] = None) -> Opt
     try:
         analyst_model = (settings.OLLAMA_ANALYST_MODEL or settings.OLLAMA_MODEL).strip()
         if settings.PROCESSING_PROFILE == "eco" and not settings.OLLAMA_ANALYST_MODEL:
-            analyst_model = "qwen2.5:7b"
+            analyst_model = "qwen2.5:3b"
 
         segments = _parse_segments(transcript)
         cleaned_transcript = "\n".join(
@@ -421,23 +491,25 @@ def analyze_transcript(transcript: str, video_path: Optional[str] = None) -> Opt
         if settings.ANALYSIS_ENABLE_SCENE_DETECTION and settings.PROCESSING_PROFILE == "quality":
             scene_cuts = _detect_scene_cuts(video_path)
         candidates = _build_candidates(segments, scene_cuts, total_duration)
-        candidate_summary = _candidate_windows_summary_v3(candidates, scene_cuts)
+        max_candidates = max(3, settings.ANALYSIS_MAX_CANDIDATES)
+        candidate_summary = _candidate_windows_summary_v3(candidates[:max_candidates], scene_cuts)
         if not candidate_summary:
             candidate_summary = _candidate_windows_summary(segments)
 
-        user_payload = cleaned_transcript[:15000]
+        user_payload = cleaned_transcript[:max(2000, settings.ANALYSIS_TRANSCRIPT_MAX_CHARS)]
         if candidate_summary:
             user_payload = f"{candidate_summary}\n\nTranscript:\n{user_payload}"
 
-        response = ollama.chat(
-            model=analyst_model,
-            messages=[
-                {'role': 'system', 'content': system_prompt},
-                {'role': 'user', 'content': user_payload},
-            ],
-            keep_alive=settings.OLLAMA_KEEP_ALIVE,
-        )
-        content = response['message']['content'].strip()
+        backend = (settings.ANALYSIS_BACKEND or "ollama").strip().lower()
+        content = None
+        used_backend = "ollama"
+        if backend == "airllm":
+            content = _chat_with_airllm(system_prompt, user_payload)
+            if content:
+                used_backend = "airllm"
+        if not content:
+            content = _chat_with_ollama(system_prompt, user_payload, analyst_model)
+            used_backend = "ollama"
 
         # Extract Strategy and JSON
         strategy = "Analyzing content structure..."
@@ -456,6 +528,7 @@ def analyze_transcript(transcript: str, video_path: Optional[str] = None) -> Opt
             data['strategy_thought'] = strategy
             durations = [round(h['end'] - h['start'], 2) for h in data['hooks']]
             data['analysis_meta'] = {
+                'backend': used_backend,
                 'model': analyst_model,
                 'candidate_count': len(candidates),
                 'scene_cut_count': len(scene_cuts),

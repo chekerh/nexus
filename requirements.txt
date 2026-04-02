@@ -5,3 +5,5 @@ python-multipart
 httpx
 ollama
 ffmpeg-python
+# Optional experimental backend (enable with ANALYSIS_BACKEND=airllm)
+# airllm

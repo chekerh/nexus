@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     WHISPER_MODEL_PATH: str = "/usr/local/share/whisper/models/ggml-base.en.bin"
     OLLAMA_MODEL: str = "qwen2.5:7b"
     OLLAMA_ANALYST_MODEL: str = ""
-    OLLAMA_STYLE_MODEL: str = "qwen2.5:3b"
+    OLLAMA_STYLE_MODEL: str = "qwen2.5:0.5b"
     OLLAMA_KEEP_ALIVE: str = "3m"
     ANALYSIS_BACKEND: str = "ollama"  # ollama | airllm
     AIRLLM_MODEL_ID: str = "Qwen/Qwen2.5-3B-Instruct"

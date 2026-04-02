@@ -336,6 +336,11 @@ hr { border: 0; border-top: 1px solid rgba(112, 160, 255, .16); }
 .caption-overlay.cap-warning span { font-size: 1.14rem; color: #ffd2d9; background: rgba(115, 24, 41, .82); animation: cap-shake .3s ease-in-out; }
 .caption-overlay.cap-hype span { font-size: 1.18rem; color: #fff5b3; background: rgba(107, 76, 21, .84); animation: cap-pop .3s ease-out; }
 
+.caption-overlay.cap-v1 span { filter: saturate(1.05); }
+.caption-overlay.cap-v2 span { filter: hue-rotate(12deg) saturate(1.12); }
+.caption-overlay.cap-v3 span { filter: hue-rotate(-14deg) saturate(1.15); }
+.caption-overlay.cap-v4 span { filter: hue-rotate(24deg) saturate(1.2); }
+
 @keyframes cap-pop {
     0% { transform: scale(.85); opacity: .8; }
     100% { transform: scale(1); opacity: 1; }

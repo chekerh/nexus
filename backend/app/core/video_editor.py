@@ -148,7 +148,7 @@ def _choose_caption_style(text: str) -> str:
 def _choose_style_model() -> str:
     model = (settings.OLLAMA_STYLE_MODEL or settings.OLLAMA_ANALYST_MODEL or settings.OLLAMA_MODEL).strip()
     if settings.PROCESSING_PROFILE == "eco" and not settings.OLLAMA_STYLE_MODEL:
-        return "qwen2.5:3b"
+        return "qwen2.5:0.5b"
     return model
 
 def _infer_caption_styles_with_ai(texts: List[str]) -> List[str]:
@@ -324,6 +324,7 @@ def _assign_visual_variants(entries: List[Dict]) -> None:
         elif style == "money":
             variant_base = 3 if i % 2 == 0 else 1
         entry["variant"] = variant_base
+        entry["cue_index"] = i + 1
 
 def _write_clip_ass(ass_path: str, segments: List[Dict], clip_start: float, clip_end: float, max_words: int, font_size: int, process_id: Optional[str] = None, thought_callback=None, clip_index: int = 0) -> bool:
     clip_entries: List[Dict] = []
