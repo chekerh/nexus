@@ -406,6 +406,23 @@ def _snap_hooks_to_candidates(hooks: List[Dict], candidates: List[Dict]) -> List
 
     return result
 
+def _fallback_hooks_from_candidates(candidates: List[Dict]) -> List[Dict]:
+    """Guarantee at least a few hooks even when the LLM response is malformed."""
+    if not candidates:
+        return []
+
+    hooks = []
+    top = candidates[:3]
+    for i, c in enumerate(top, start=1):
+        hooks.append({
+            "start": c["start"],
+            "end": c["end"],
+            "hook_name": f"Hook {i}: High-Impact Moment",
+            "caption": c.get("reason", ""),
+            "confidence": round(min(0.95, max(0.35, c.get("score", 5.0) / 10.0)), 2),
+        })
+    return hooks
+
 def analyze_transcript(transcript: str, video_path: Optional[str] = None) -> Optional[Dict]:
     """Analyzes transcript using local Ollama instance for viral hooks and strategy."""
     strategist_prompt = _read_prompt_file(settings.STRATEGIST_PROMPT_FILE)
@@ -486,6 +503,7 @@ def analyze_transcript(transcript: str, video_path: Optional[str] = None) -> Opt
             data['analysis_meta'] = {
                 'backend': used_backend,
                 'model': analyst_model,
+                'fallback_used': False,
                 'candidate_count': len(candidates),
                 'scene_cut_count': len(scene_cuts),
                 'durations': durations,
@@ -493,7 +511,29 @@ def analyze_transcript(transcript: str, video_path: Optional[str] = None) -> Opt
                 'duration_max': max(durations) if durations else 0,
                 'duration_avg': round(sum(durations) / len(durations), 2) if durations else 0,
             }
-            return data
+            if data['hooks']:
+                return data
+
+        # Fallback path when model output is invalid or empty.
+        fallback_hooks = _fallback_hooks_from_candidates(candidates)
+        if fallback_hooks:
+            normalized = _normalize_hooks(fallback_hooks)
+            durations = [round(h['end'] - h['start'], 2) for h in normalized]
+            return {
+                'hooks': normalized,
+                'strategy_thought': strategy if strategy else "Fallback strategy applied from hybrid heuristic scoring.",
+                'analysis_meta': {
+                    'backend': used_backend,
+                    'model': analyst_model,
+                    'fallback_used': True,
+                    'candidate_count': len(candidates),
+                    'scene_cut_count': len(scene_cuts),
+                    'durations': durations,
+                    'duration_min': min(durations) if durations else 0,
+                    'duration_max': max(durations) if durations else 0,
+                    'duration_avg': round(sum(durations) / len(durations), 2) if durations else 0,
+                }
+            }
 
         return None
 

@@ -324,6 +324,8 @@ def run_pipeline_sync(process_id: str, video_path: str):
                 process_id,
                 f"Selection Engine: {meta.get('candidate_count', 0)} candidates ranked, {meta.get('scene_cut_count', 0)} scene boundaries used, backend={meta.get('backend', 'ollama')}, model={meta.get('model', 'n/a')}."
             )
+            if meta.get("fallback_used"):
+                add_thought(process_id, "Selection Engine: Model output format failed, heuristic fallback hooks were applied.")
             add_thought(
                 process_id,
                 f"Duration Optimizer: min={meta.get('duration_min', 0)}s avg={meta.get('duration_avg', 0)}s max={meta.get('duration_max', 0)}s."
