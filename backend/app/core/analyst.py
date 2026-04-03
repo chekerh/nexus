@@ -502,7 +502,7 @@ def analyze_transcript(transcript: str, video_path: Optional[str] = None) -> Opt
             durations = [round(h['end'] - h['start'], 2) for h in data['hooks']]
             data['analysis_meta'] = {
                 'backend': used_backend,
-                'model': analyst_model,
+                'model': settings.AIRLLM_MODEL_ID if used_backend == 'airllm' else analyst_model,
                 'fallback_used': False,
                 'candidate_count': len(candidates),
                 'scene_cut_count': len(scene_cuts),
@@ -524,7 +524,7 @@ def analyze_transcript(transcript: str, video_path: Optional[str] = None) -> Opt
                 'strategy_thought': strategy if strategy else "Fallback strategy applied from hybrid heuristic scoring.",
                 'analysis_meta': {
                     'backend': used_backend,
-                    'model': analyst_model,
+                    'model': settings.AIRLLM_MODEL_ID if used_backend == 'airllm' else analyst_model,
                     'fallback_used': True,
                     'candidate_count': len(candidates),
                     'scene_cut_count': len(scene_cuts),

@@ -18,9 +18,15 @@ OLLAMA_ANALYST_MODEL="$(grep -E '^OLLAMA_ANALYST_MODEL=' .env 2>/dev/null | head
 OLLAMA_STYLE_MODEL="$(grep -E '^OLLAMA_STYLE_MODEL=' .env 2>/dev/null | head -n1 | cut -d'=' -f2- || true)"
 OLLAMA_FALLBACK_MODEL="$(grep -E '^OLLAMA_FALLBACK_MODEL=' .env 2>/dev/null | head -n1 | cut -d'=' -f2- || true)"
 DEV_RELOAD="$(grep -E '^DEV_RELOAD=' .env 2>/dev/null | head -n1 | cut -d'=' -f2- || true)"
+ANALYSIS_BACKEND="$(grep -E '^ANALYSIS_BACKEND=' .env 2>/dev/null | head -n1 | cut -d'=' -f2- || true)"
+AIRLLM_MODEL_ID="$(grep -E '^AIRLLM_MODEL_ID=' .env 2>/dev/null | head -n1 | cut -d'=' -f2- || true)"
+CAPTION_STYLE_MODE="$(grep -E '^CAPTION_STYLE_MODE=' .env 2>/dev/null | head -n1 | cut -d'=' -f2- || true)"
 OLLAMA_MODEL="${OLLAMA_MODEL:-qwen2.5:7b}"
 OLLAMA_FALLBACK_MODEL="${OLLAMA_FALLBACK_MODEL:-qwen2.5:3b}"
 DEV_RELOAD="${DEV_RELOAD:-false}"
+ANALYSIS_BACKEND="${ANALYSIS_BACKEND:-ollama}"
+AIRLLM_MODEL_ID="${AIRLLM_MODEL_ID:-Qwen/Qwen2.5-3B-Instruct}"
+CAPTION_STYLE_MODE="${CAPTION_STYLE_MODE:-hybrid}"
 
 dev_reload_enabled() {
   case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
@@ -74,8 +80,37 @@ ensure_model_available() {
   return 0
 }
 
+normalize_lower() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+require_airllm_python_package() {
+  if python - <<'PY' >/dev/null 2>&1
+import importlib
+raise SystemExit(0 if importlib.util.find_spec('airllm') else 1)
+PY
+  then
+    return 0
+  fi
+
+  echo "Installing airllm for ANALYSIS_BACKEND=airllm..."
+  pip install "airllm>=2.11.0" >/dev/null
+}
+
+BACKEND_LC="$(normalize_lower "$ANALYSIS_BACKEND")"
+STYLE_MODE_LC="$(normalize_lower "$CAPTION_STYLE_MODE")"
+NEED_OLLAMA=true
+if [[ "$BACKEND_LC" == "airllm" && "$STYLE_MODE_LC" == "rule" ]]; then
+  NEED_OLLAMA=false
+fi
+
+if [[ "$BACKEND_LC" == "airllm" ]]; then
+  echo "Analysis backend: airllm ($AIRLLM_MODEL_ID)"
+  require_airllm_python_package
+fi
+
 # 3) Start Ollama only if not already running
-if ! curl -sSf http://127.0.0.1:11434/api/tags >/dev/null 2>&1; then
+if [[ "$NEED_OLLAMA" == "true" ]] && ! curl -sSf http://127.0.0.1:11434/api/tags >/dev/null 2>&1; then
   echo "Starting Ollama server..."
   ollama serve >/tmp/nexus-ollama.log 2>&1 &
   OLLAMA_PID=$!
@@ -85,7 +120,7 @@ else
 fi
 
 # 4) Ensure models are available (with retry + fallback)
-if ! ensure_model_available "$OLLAMA_MODEL" required; then
+if [[ "$BACKEND_LC" != "airllm" ]] && ! ensure_model_available "$OLLAMA_MODEL" required; then
   echo "Warning: primary model '$OLLAMA_MODEL' unavailable. Trying fallback '$OLLAMA_FALLBACK_MODEL'..."
   if ensure_model_available "$OLLAMA_FALLBACK_MODEL" required; then
     export OLLAMA_MODEL="$OLLAMA_FALLBACK_MODEL"
@@ -100,11 +135,11 @@ if ! ensure_model_available "$OLLAMA_MODEL" required; then
   fi
 fi
 
-if [[ -n "${OLLAMA_ANALYST_MODEL:-}" ]]; then
+if [[ "$BACKEND_LC" != "airllm" && -n "${OLLAMA_ANALYST_MODEL:-}" ]]; then
   ensure_model_available "$OLLAMA_ANALYST_MODEL" optional || true
 fi
 
-if [[ -n "${OLLAMA_STYLE_MODEL:-}" ]]; then
+if [[ "$NEED_OLLAMA" == "true" && -n "${OLLAMA_STYLE_MODEL:-}" ]]; then
   ensure_model_available "$OLLAMA_STYLE_MODEL" optional || true
 fi
 
