@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Groups - Nexus-UGC</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">Nexus-UGC</div>
+            <nav>
+                <a href="index.html" class="nav-item">AI Pipeline</a>
+                <a href="accounts.html" class="nav-item active">Account Groups</a>
+                <a href="#" class="nav-item disabled">History</a>
+            </nav>
+
+            <section class="card sidebar-runtime" id="runtime-panel">
+                <h3>AI Runtime</h3>
+                <p class="accounts-subtitle" id="backend-status-label">Backend: checking...</p>
+                <button class="btn btn-secondary" id="unload-backend-btn">Release AI Memory</button>
+            </section>
+        </aside>
+
+        <!-- Main Content - Account Groups Dashboard -->
+        <main class="main-content">
+            <header class="page-header">
+                <div class="page-header-content">
+                    <div class="page-icon">👥</div>
+                    <div class="page-title-group">
+                        <h1>Account Groups</h1>
+                        <p>Manage your social media accounts and organize them into groups for bulk publishing.</p>
+                    </div>
+                </div>
+                <div class="page-stats" id="page-stats">
+                    <div class="stat-item">
+                        <span class="stat-value" id="stat-groups">0</span>
+                        <span class="stat-label">Groups</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="stat-accounts">0</span>
+                        <span class="stat-label">Accounts</span>
+                    </div>
+                </div>
+            </header>
+
+            <div class="dashboard-grid">
+                <!-- Create Group Card -->
+                <section class="dashboard-card create-card">
+                    <div class="card-header">
+                        <span class="card-icon">📁</span>
+                        <h3>Create New Group</h3>
+                    </div>
+                    <p class="card-description">Create a group to organize your accounts (e.g., "Personal", "Brand", "Clients")</p>
+                    <div class="create-form">
+                        <div class="form-field">
+                            <label>Group Name</label>
+                            <input id="group-name" type="text" placeholder="e.g., Personal Accounts" class="modern-input">
+                        </div>
+                        <div class="form-field">
+                            <label>Description <span class="optional">(optional)</span></label>
+                            <input id="group-description" type="text" placeholder="What this group is for" class="modern-input">
+                        </div>
+                        <button class="btn btn-primary" id="add-group-btn">
+                            <span class="btn-icon">✨</span> Create Group
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Add Account Card -->
+                <section class="dashboard-card create-card">
+                    <div class="card-header">
+                        <span class="card-icon">🔐</span>
+                        <h3>Add Account</h3>
+                    </div>
+                    <p class="card-description">Add a new social media account to your collection</p>
+                    <div class="create-form">
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label>Platform</label>
+                                <select id="account-platform" class="modern-select">
+                                    <option value="tiktok">TikTok</option>
+                                    <option value="instagram">Instagram</option>
+                                    <option value="youtube">YouTube</option>
+                                </select>
+                            </div>
+                            <div class="form-field flex-2">
+                                <label>Account Name</label>
+                                <input id="account-name" type="text" placeholder="e.g., @mybrand" class="modern-input">
+                            </div>
+                        </div>
+                        <div class="form-field">
+                            <label>Notes <span class="optional">(optional)</span></label>
+                            <input id="account-notes" type="text" placeholder="Any notes about this account" class="modern-input">
+                        </div>
+                        <div id="credential-fields">
+                            <!-- YouTube Fields -->
+                            <div class="credential-section hidden" data-platform="youtube">
+                                <div class="form-field">
+                                    <label>YouTube Refresh Token <span class="optional">(for auto-publish)</span></label>
+                                    <input id="account-refresh-token" type="password" placeholder="Refresh token" class="modern-input">
+                                </div>
+                                <div class="form-field">
+                                    <label>Privacy Setting</label>
+                                    <select id="account-youtube-privacy" class="modern-select">
+                                        <option value="private">Private</option>
+                                        <option value="unlisted">Unlisted</option>
+                                        <option value="public">Public</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <!-- Instagram Fields -->
+                            <div class="credential-section hidden" data-platform="instagram">
+                                <div class="form-field">
+                                    <label>Instagram User ID</label>
+                                    <input id="account-instagram-user-id" type="text" placeholder="User ID for API publishing" class="modern-input">
+                                </div>
+                                <div class="form-field">
+                                    <label>Access Token</label>
+                                    <input id="account-instagram-token" type="password" placeholder="Long-lived access token" class="modern-input">
+                                </div>
+                            </div>
+                            <!-- TikTok Fields -->
+                            <div class="credential-section hidden" data-platform="tiktok">
+                                <div class="form-field">
+                                    <label>Open ID <span class="optional"></span></label>
+                                    <input id="account-tiktok-open-id" type="text" placeholder="TikTok Open ID" class="modern-input">
+                                </div>
+                                <div class="form-field">
+                                    <label>Refresh Token <span class="optional">(preferred)</span></label>
+                                    <input id="account-tiktok-refresh-token" type="password" placeholder="Refresh token" class="modern-input">
+                                </div>
+                                <div class="form-field">
+                                    <label>Access Token <span class="optional">(alternative)</span></label>
+                                    <input id="account-tiktok-access-token" type="password" placeholder="Access token" class="modern-input">
+                                </div>
+                            </div>
+                        </div>
+                        <button class="btn btn-secondary" id="add-account-btn">Add Account</button>
+                    </div>
+                </section>
+
+                <!-- Groups List -->
+                <section class="dashboard-card full-width">
+                    <div class="card-header">
+                        <span class="card-icon">📂</span>
+                        <h3>Your Groups</h3>
+                    </div>
+                    <div id="groups-list" class="groups-grid">
+                        <div class="empty-state">
+                            <span class="empty-icon">📭</span>
+                            <p>No groups yet. Create your first group above!</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- All Accounts List -->
+                <section class="dashboard-card full-width">
+                    <div class="card-header">
+                        <span class="card-icon">🌐</span>
+                        <h3>All Accounts</h3>
+                    </div>
+                    <div id="accounts-list" class="accounts-grid">
+                        <div class="empty-state">
+                            <span class="empty-icon">👤</span>
+                            <p>No accounts yet. Add your first account above!</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+    <script src="accounts.js"></script>
+</body>
+</html>

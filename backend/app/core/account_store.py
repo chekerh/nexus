@@ -3,6 +3,15 @@ import os
 import threading
 import uuid
 from typing import Dict, List, Optional
+from .security import encrypt_token, decrypt_token, log_audit
+
+# Fields that should be encrypted
+ENCRYPTED_FIELDS = [
+    "oauth_refresh_token",
+    "instagram_access_token",
+    "tiktok_refresh_token",
+    "tiktok_access_token",
+]
 
 
 class AccountStore:
@@ -32,17 +41,32 @@ class AccountStore:
     def list_accounts(self, platform: Optional[str] = None) -> List[Dict]:
         with self._lock:
             data = self._read_data()
-            if platform:
-                return [a for a in data if a.get("platform") == platform]
-            return data
+            accounts = [a for a in data if not platform or a.get("platform") == platform]
+            return [self._decrypt_account_fields(a) for a in accounts]
 
     def get_account(self, account_id: str) -> Optional[Dict]:
         with self._lock:
             data = self._read_data()
             for account in data:
                 if account.get("id") == account_id:
-                    return account
+                    return self._decrypt_account_fields(account)
             return None
+
+    def _encrypt_account_fields(self, account: Dict) -> Dict:
+        """Encrypt sensitive fields in account data."""
+        encrypted = dict(account)
+        for field in ENCRYPTED_FIELDS:
+            if field in encrypted and encrypted[field]:
+                encrypted[field] = encrypt_token(encrypted[field])
+        return encrypted
+
+    def _decrypt_account_fields(self, account: Dict) -> Dict:
+        """Decrypt sensitive fields in account data."""
+        decrypted = dict(account)
+        for field in ENCRYPTED_FIELDS:
+            if field in decrypted and decrypted[field]:
+                decrypted[field] = decrypt_token(decrypted[field])
+        return decrypted
 
     def create_account(self, account: Dict) -> Dict:
         with self._lock:
@@ -62,15 +86,37 @@ class AccountStore:
                 "tiktok_access_token": account.get("tiktok_access_token", ""),
                 "created_at": account.get("created_at"),
             }
+            # Encrypt sensitive fields before storing
+            new_account = self._encrypt_account_fields(new_account)
             data.append(new_account)
             self._write_data(data)
-            return new_account
+            # Log the action (without sensitive data)
+            log_audit("account_created", {
+                "account_id": new_account["id"],
+                "platform": new_account["platform"],
+                "account_name": new_account["account_name"]
+            })
+            return self._decrypt_account_fields(new_account)
 
     def delete_account(self, account_id: str) -> bool:
         with self._lock:
             data = self._read_data()
-            new_data = [a for a in data if a.get("id") != account_id]
-            if len(new_data) == len(data):
+            # Find account for audit log before deleting
+            account = None
+            for a in data:
+                if a.get("id") == account_id:
+                    account = a
+                    break
+            if not account:
                 return False
+
+            new_data = [a for a in data if a.get("id") != account_id]
             self._write_data(new_data)
+
+            # Log the action
+            log_audit("account_deleted", {
+                "account_id": account_id,
+                "platform": account.get("platform"),
+                "account_name": account.get("account_name")
+            })
             return True

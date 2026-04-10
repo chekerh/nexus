@@ -15,8 +15,8 @@
         <aside class="sidebar">
             <div class="logo">Nexus-UGC</div>
             <nav>
-                <a href="#" class="nav-item active" id="nav-pipeline">AI Pipeline</a>
-                <a href="#" class="nav-item" id="nav-accounts">Account Groups</a>
+                <a href="index.html" class="nav-item active">AI Pipeline</a>
+                <a href="accounts.html" class="nav-item">Account Groups</a>
                 <a href="#" class="nav-item disabled">History</a>
             </nav>
 
@@ -26,79 +26,35 @@
                 <button class="btn btn-secondary" id="unload-backend-btn">Release AI Memory</button>
             </section>
 
-            <section class="card accounts-section sidebar-accounts hidden" id="sidebar-accounts-panel">
-                <h3>Account Groups</h3>
-                <p class="accounts-subtitle">Manage posting accounts for TikTok, Instagram, and YouTube.</p>
-
-                <!-- Groups Section -->
-                <div class="groups-section">
-                    <h4>Account Groups</h4>
-                    <p class="input-hint">Create groups to organize accounts (e.g., "Personal", "Brand", "Clients")</p>
-                    <div class="group-form">
-                        <input id="group-name" type="text" placeholder="Group name (e.g. Personal Accounts)">
-                        <input id="group-description" type="text" placeholder="Description (optional)">
-                        <button class="btn btn-secondary" id="add-group-btn">Create Group</button>
-                    </div>
-                    <div id="groups-list" class="groups-list"></div>
-                </div>
-
-                <hr class="section-divider">
-
-                <!-- Individual Accounts Section -->
-                <div class="accounts-section-header">
-                    <h4>Individual Accounts</h4>
-                    <button class="btn btn-sm btn-secondary" id="toggle-account-form">+ Add Account</button>
-                </div>
-
-                <div id="account-form-container" class="account-form-grid hidden">
-                    <select id="account-platform">
-                        <option value="tiktok">TikTok</option>
-                        <option value="instagram">Instagram</option>
-                        <option value="youtube">YouTube</option>
-                    </select>
-                    <input id="account-name" type="text" placeholder="Account name (e.g. @mybrand_main)">
-                    <input id="account-notes" type="text" placeholder="Notes (optional)">
-                    <input id="account-refresh-token" type="password" placeholder="YouTube refresh token (optional for auto-publish)">
-                    <select id="account-youtube-privacy">
-                        <option value="private">YouTube privacy: private</option>
-                        <option value="unlisted">YouTube privacy: unlisted</option>
-                        <option value="public">YouTube privacy: public</option>
-                    </select>
-                    <input id="account-instagram-user-id" type="text" placeholder="Instagram user ID (for API publish)">
-                    <input id="account-instagram-token" type="password" placeholder="Instagram long-lived access token">
-                    <input id="account-tiktok-open-id" type="text" placeholder="TikTok open_id (optional)">
-                    <input id="account-tiktok-refresh-token" type="password" placeholder="TikTok refresh token (preferred)">
-                    <input id="account-tiktok-access-token" type="password" placeholder="TikTok access token (optional)">
-                    <button class="btn btn-secondary" id="add-account-btn">Add Account</button>
-                </div>
-                <div id="accounts-list" class="accounts-list"></div>
-            </section>
         </aside>
 
         <!-- Main Content -->
         <main class="main-content">
             <header class="main-header">
-                <h1>Viral Strategy Engine</h1>
-                <p>Upload a video to generate local AI transcripts and hooks.</p>
-                <div class="account-row" style="margin-top: 1rem; background: rgba(8,13,30,.55);">
-                    <div>
-                        <strong>Realtime AI Pipeline</strong>
-                        <span class="account-tag">Whisper</span>
-                        <span class="account-tag">Qwen</span>
-                        <span class="account-tag">FFmpeg</span>
+                    <h1>Viral Strategy Engine</h1>
+                    <p>Upload a video to generate local AI transcripts and hooks.</p>
+                    <div class="account-row" style="margin-top: 1rem; background: rgba(8,13,30,.55);">
+                        <div>
+                            <strong>Realtime AI Pipeline</strong>
+                            <span class="account-tag">Whisper</span>
+                            <span class="account-tag">Qwen</span>
+                            <span class="account-tag">FFmpeg</span>
+                        </div>
+                        <div class="account-tag" style="background: rgba(93,215,255,.22); border-color: rgba(93,215,255,.38); color: #d8f8ff;">Local-First</div>
                     </div>
-                    <div class="account-tag" style="background: rgba(93,215,255,.22); border-color: rgba(93,215,255,.38); color: #d8f8ff;">Local-First</div>
-                </div>
-            </header>
+                </header>
 
-            <!-- Upload Section -->
-            <section class="upload-section card">
+                <!-- Upload Section -->
+                <section class="upload-section card">
                 <div class="input-tabs">
                     <button class="tab-btn active" id="tab-file" data-tab="file">
                         <span class="tab-icon">📤</span> Upload File
                     </button>
                     <button class="tab-btn" id="tab-drive" data-tab="drive">
                         <span class="tab-icon">☁️</span> Google Drive
+                    </button>
+                    <button class="tab-btn" id="tab-endscreen" data-tab="endscreen">
+                        <span class="tab-icon">🎯</span> End Screen
                     </button>
                 </div>
                 
@@ -126,6 +82,34 @@
                         <p class="input-hint">Make sure the file is shared with "Anyone with the link can view"</p>
                     </div>
                     <button class="btn btn-primary" id="process-drive-btn">Fetch from Drive & Analyze</button>
+                </div>
+
+                <div class="tab-content" id="content-endscreen">
+                    <div class="drive-section-header">
+                        <div class="drive-icon" style="background: linear-gradient(135deg, #ff6b9d, #feca57);">🎯</div>
+                        <span class="drive-section-title">End Screen & Call-to-Action</span>
+                    </div>
+                    <div class="endscreen-preview" id="endscreen-preview">
+                        <div class="endscreen-placeholder">
+                            <div class="endscreen-icon">🖼️</div>
+                            <p class="endscreen-text">No end screen image selected</p>
+                        </div>
+                        <img id="endscreen-img-preview" class="endscreen-img hidden" alt="End screen preview">
+                    </div>
+                    <div class="upload-dropzone endscreen-dropzone" id="endscreen-dropzone">
+                        <div class="dropzone-icon">📸</div>
+                        <p class="dropzone-text">Click to upload end screen image</p>
+                        <p class="dropzone-hint">Recommended: 1080x1920 (9:16) for vertical videos</p>
+                        <input type="file" id="endscreen-input" accept="image/*" hidden>
+                    </div>
+                    <div class="cta-input-wrapper">
+                        <label for="cta-text-input" class="cta-label">Call-to-Action Text</label>
+                        <input type="text" id="cta-text-input" class="cta-text-input" value="Link in bio to try it free." placeholder="Enter your call-to-action...">
+                        <p class="input-hint">This text will appear on the end screen image at the end of each clip</p>
+                    </div>
+                    <div class="endscreen-status" id="endscreen-status">
+                        <span class="endscreen-badge inactive" id="endscreen-badge">No end screen set</span>
+                    </div>
                 </div>
             </section>
 

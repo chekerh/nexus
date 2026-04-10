@@ -8,9 +8,6 @@ const transcriptContent = document.getElementById('transcript-content');
 const analysisContent = document.getElementById('analysis-content');
 const statusTimer = document.getElementById('status-timer');
 const timingSummary = document.getElementById('timing-summary');
-const navPipeline = document.getElementById('nav-pipeline');
-const navAccounts = document.getElementById('nav-accounts');
-const sidebarAccountsPanel = document.getElementById('sidebar-accounts-panel');
 const toastContainer = document.getElementById('toast-container');
 const unloadBackendBtn = document.getElementById('unload-backend-btn');
 const backendStatusLabel = document.getElementById('backend-status-label');
@@ -18,27 +15,7 @@ const backendStatusLabel = document.getElementById('backend-status-label');
 const stopBtn = document.getElementById('stop-btn');
 const thinkingConsole = document.getElementById('thinking-console');
 const statusTitle = document.getElementById('status-title');
-const addAccountBtn = document.getElementById('add-account-btn');
-const accountPlatform = document.getElementById('account-platform');
-const accountName = document.getElementById('account-name');
-const accountNotes = document.getElementById('account-notes');
-const accountRefreshToken = document.getElementById('account-refresh-token');
-const accountYoutubePrivacy = document.getElementById('account-youtube-privacy');
-const accountInstagramUserId = document.getElementById('account-instagram-user-id');
-const accountInstagramToken = document.getElementById('account-instagram-token');
-const accountTikTokOpenId = document.getElementById('account-tiktok-open-id');
-const accountTikTokRefreshToken = document.getElementById('account-tiktok-refresh-token');
-const accountTikTokAccessToken = document.getElementById('account-tiktok-access-token');
-const accountsList = document.getElementById('accounts-list');
 const publishConsole = document.getElementById('publish-console');
-
-// Account Groups Elements
-const groupName = document.getElementById('group-name');
-const groupDescription = document.getElementById('group-description');
-const addGroupBtn = document.getElementById('add-group-btn');
-const groupsList = document.getElementById('groups-list');
-const toggleAccountFormBtn = document.getElementById('toggle-account-form');
-const accountFormContainer = document.getElementById('account-form-container');
 
 // Google Drive elements
 const tabFile = document.getElementById('tab-file');
@@ -48,10 +25,19 @@ const contentDrive = document.getElementById('content-drive');
 const driveUrlInput = document.getElementById('drive-url');
 const processDriveBtn = document.getElementById('process-drive-btn');
 
+// End Screen elements
+const tabEndscreen = document.getElementById('tab-endscreen');
+const contentEndscreen = document.getElementById('content-endscreen');
+const endscreenDropzone = document.getElementById('endscreen-dropzone');
+const endscreenInput = document.getElementById('endscreen-input');
+const endscreenImgPreview = document.getElementById('endscreen-img-preview');
+const endscreenPreview = document.getElementById('endscreen-preview');
+const ctaTextInput = document.getElementById('cta-text-input');
+const endscreenBadge = document.getElementById('endscreen-badge');
+
 let selectedFile = null;
+let endscreenFile = null;  // End screen image file
 let currentProcessId = null;
-let accountsCache = [];
-let groupsCache = [];
 let statusTimerInterval = null;
 let statusStartMs = 0;
 
@@ -129,17 +115,6 @@ async function refreshBackendRuntimeStatus() {
     }
 }
 
-function setSidebarView(view) {
-    if (view === 'accounts') {
-        sidebarAccountsPanel.classList.remove('hidden');
-        navAccounts.classList.add('active');
-        navPipeline.classList.remove('active');
-    } else {
-        sidebarAccountsPanel.classList.add('hidden');
-        navPipeline.classList.add('active');
-        navAccounts.classList.remove('active');
-    }
-}
 
 // Handle File Selection
 dropzone.onclick = () => fileInput.click();
@@ -152,23 +127,55 @@ fileInput.onchange = (e) => {
     }
 };
 
+// End Screen Image Handling
+endscreenDropzone?.addEventListener('click', () => endscreenInput?.click());
+
+endscreenInput.onchange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        endscreenFile = file;
+        // Show preview
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            endscreenImgPreview.src = event.target.result;
+            endscreenImgPreview.classList.remove('hidden');
+            endscreenPreview.querySelector('.endscreen-placeholder')?.classList.add('hidden');
+        };
+        reader.readAsDataURL(file);
+        // Update badge
+        endscreenBadge.textContent = 'End screen ready';
+        endscreenBadge.classList.remove('inactive');
+        endscreenBadge.classList.add('active');
+        showToast('End screen set', `Image "${file.name}" will appear at the end of each clip`);
+    }
+};
+
 // Tab Switching
 function switchTab(tab) {
+    // Remove active from all tabs
+    tabFile?.classList.remove('active');
+    tabDrive?.classList.remove('active');
+    tabEndscreen?.classList.remove('active');
+    contentFile?.classList.remove('active');
+    contentDrive?.classList.remove('active');
+    contentEndscreen?.classList.remove('active');
+
+    // Add active to selected tab
     if (tab === 'file') {
-        tabFile.classList.add('active');
-        tabDrive.classList.remove('active');
-        contentFile.classList.add('active');
-        contentDrive.classList.remove('active');
-    } else {
-        tabFile.classList.remove('active');
-        tabDrive.classList.add('active');
-        contentFile.classList.remove('active');
-        contentDrive.classList.add('active');
+        tabFile?.classList.add('active');
+        contentFile?.classList.add('active');
+    } else if (tab === 'drive') {
+        tabDrive?.classList.add('active');
+        contentDrive?.classList.add('active');
+    } else if (tab === 'endscreen') {
+        tabEndscreen?.classList.add('active');
+        contentEndscreen?.classList.add('active');
     }
 }
 
 tabFile?.addEventListener('click', () => switchTab('file'));
 tabDrive?.addEventListener('click', () => switchTab('drive'));
+tabEndscreen?.addEventListener('click', () => switchTab('endscreen'));
 
 // Google Drive Processing
 processDriveBtn?.addEventListener('click', async () => {
@@ -218,11 +225,23 @@ processBtn.onclick = async () => {
     const formData = new FormData();
     formData.append('file', selectedFile);
 
+    // Add end screen image if set
+    if (endscreenFile) {
+        formData.append('endscreen_image', endscreenFile);
+    }
+
+    // Add CTA text
+    const ctaText = ctaTextInput?.value?.trim() || 'Link in bio to try it free.';
+    formData.append('cta_text', ctaText);
+
     // Reset UI
     processBtn.disabled = true;
     statusSection.classList.remove('hidden');
     resultsSection.classList.add('hidden');
     thinkingConsole.innerHTML = '<div class="thinking-line">Initializing local AI engine...</div>';
+    if (endscreenFile) {
+        thinkingConsole.innerHTML += `<div class="thinking-line">End screen configured: "${ctaText}"</div>`;
+    }
     statusTitle.innerText = "AI Processing...";
     timingSummary.innerText = 'Awaiting stage metrics...';
     startStatusTimer();
@@ -309,12 +328,15 @@ async function pollStatus(processId) {
 
 const clipsContainer = document.getElementById('clips-container');
 
+// Minimal accounts/groups cache for publishing functionality
+let accountsCache = [];
+let groupsCache = [];
+
 async function loadAccounts() {
     try {
         const res = await fetch('/accounts');
         const data = await res.json();
         accountsCache = data.accounts || [];
-        renderAccountsList();
     } catch (err) {
         console.error('Failed to load accounts', err);
     }
@@ -325,242 +347,14 @@ async function loadGroups() {
         const res = await fetch('/account-groups');
         const data = await res.json();
         groupsCache = data.groups || [];
-        renderGroupsList();
     } catch (err) {
         console.error('Failed to load groups', err);
     }
 }
 
-function renderGroupsList() {
-    if (!groupsList) return;
-
-    if (!groupsCache.length) {
-        groupsList.innerHTML = '<p class="account-empty">No groups created yet. Create a group to organize your accounts.</p>';
-        return;
-    }
-
-    groupsList.innerHTML = groupsCache.map(group => {
-        const accounts = group.accounts || [];
-        const accountChips = accounts.map(acc => `
-            <span class="group-account-chip">
-                ${acc.account_name}
-                <button onclick="removeAccountFromGroup('${group.id}', '${acc.id}')" title="Remove from group">×</button>
-            </span>
-        `).join('');
-
-        const ungroupedAccounts = accountsCache.filter(a =>
-            !accounts.some(g => g.id === a.id) &&
-            a.platform === (group.targetPlatform || a.platform)
-        );
-
-        const addToGroupForm = ungroupedAccounts.length > 0 ? `
-            <div class="add-to-group-form">
-                <select id="add-to-group-${group.id}">
-                    <option value="">Add account...</option>
-                    ${ungroupedAccounts.map(a => `<option value="${a.id}">${a.account_name} (${a.platform})</option>`).join('')}
-                </select>
-                <button class="btn btn-xs btn-add-account" onclick="addAccountToGroup('${group.id}')">Add</button>
-            </div>
-        ` : '';
-
-        return `
-            <div class="group-row" data-group-id="${group.id}">
-                <div class="group-header">
-                    <div>
-                        <span class="group-name">${group.name}</span>
-                        ${group.description ? `<span class="group-description"> - ${group.description}</span>` : ''}
-                    </div>
-                    <div class="group-actions">
-                        <button class="btn btn-xs btn-danger" onclick="deleteGroup('${group.id}')">Delete</button>
-                    </div>
-                </div>
-                ${accounts.length > 0 ? `
-                    <div class="group-accounts">
-                        ${accountChips}
-                    </div>
-                ` : '<div class="group-accounts"><span style="color: var(--muted); font-size: .75rem;">No accounts in this group yet.</span></div>'}
-                ${addToGroupForm}
-            </div>
-        `;
-    }).join('');
-}
-
-async function createGroup() {
-    const name = groupName?.value?.trim();
-    const description = groupDescription?.value?.trim();
-
-    if (!name) {
-        showToast('Error', 'Please enter a group name');
-        return;
-    }
-
-    try {
-        await fetch('/account-groups', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, description, account_ids: [] })
-        });
-
-        groupName.value = '';
-        groupDescription.value = '';
-        await loadGroups();
-        showToast('Success', `Group "${name}" created`);
-    } catch (err) {
-        console.error('Failed to create group', err);
-        showToast('Error', 'Failed to create group');
-    }
-}
-
-async function deleteGroup(groupId) {
-    if (!confirm('Delete this group? Accounts will not be deleted.')) return;
-
-    try {
-        await fetch(`/account-groups/${groupId}`, { method: 'DELETE' });
-        await loadGroups();
-        showToast('Success', 'Group deleted');
-    } catch (err) {
-        console.error('Failed to delete group', err);
-        showToast('Error', 'Failed to delete group');
-    }
-}
-
-async function addAccountToGroup(groupId) {
-    const select = document.getElementById(`add-to-group-${groupId}`);
-    const accountId = select?.value;
-
-    if (!accountId) {
-        showToast('Error', 'Please select an account');
-        return;
-    }
-
-    try {
-        await fetch(`/account-groups/${groupId}/accounts/${accountId}`, { method: 'POST' });
-        await loadGroups();
-        showToast('Success', 'Account added to group');
-    } catch (err) {
-        console.error('Failed to add account to group', err);
-        showToast('Error', 'Failed to add account to group');
-    }
-}
-
-async function removeAccountFromGroup(groupId, accountId) {
-    try {
-        await fetch(`/account-groups/${groupId}/accounts/${accountId}`, { method: 'DELETE' });
-        await loadGroups();
-        showToast('Success', 'Account removed from group');
-    } catch (err) {
-        console.error('Failed to remove account from group', err);
-        showToast('Error', 'Failed to remove account from group');
-    }
-}
-
-function renderAccountsList() {
-    if (!accountsCache.length) {
-        accountsList.innerHTML = '<p class="account-empty">No accounts added yet.</p>';
-        return;
-    }
-
-    accountsList.innerHTML = accountsCache.map(acc => `
-        <div class="account-row">
-            <div>
-                <strong>${acc.account_name}</strong>
-                <span class="account-tag">${acc.platform}</span>
-                ${acc.has_oauth_refresh_token ? '<span class="account-tag">api-ready</span>' : ''}
-                ${acc.has_instagram_access_token ? '<span class="account-tag">ig-api-ready</span>' : ''}
-                ${acc.has_tiktok_refresh_token || acc.has_tiktok_access_token ? '<span class="account-tag">tt-api-ready</span>' : ''}
-            </div>
-            <button class="btn btn-danger account-delete-btn" data-account-id="${acc.id}">Delete</button>
-        </div>
-    `).join('');
-
-    document.querySelectorAll('.account-delete-btn').forEach(btn => {
-        btn.onclick = async () => {
-            const id = btn.getAttribute('data-account-id');
-            await fetch(`/accounts/${id}`, { method: 'DELETE' });
-            await loadAccounts();
-            await loadGroups(); // Refresh groups to reflect account removal
-        };
-    });
-}
-
-addAccountBtn.onclick = async () => {
-    const platform = accountPlatform.value;
-    const name = accountName.value.trim();
-    const notes = accountNotes.value.trim();
-    const refreshToken = accountRefreshToken.value.trim();
-    const youtubePrivacyStatus = accountYoutubePrivacy.value;
-    const instagramUserId = accountInstagramUserId.value.trim();
-    const instagramAccessToken = accountInstagramToken.value.trim();
-    const tiktokOpenId = accountTikTokOpenId.value.trim();
-    const tiktokRefreshToken = accountTikTokRefreshToken.value.trim();
-    const tiktokAccessToken = accountTikTokAccessToken.value.trim();
-
-    if (!name) return;
-
-    try {
-        await fetch('/accounts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                platform,
-                account_name: name,
-                notes,
-                auth_mode: (refreshToken || instagramAccessToken || tiktokRefreshToken || tiktokAccessToken) ? 'api' : 'manual',
-                oauth_refresh_token: refreshToken,
-                youtube_privacy_status: youtubePrivacyStatus,
-                instagram_user_id: instagramUserId,
-                instagram_access_token: instagramAccessToken,
-                tiktok_open_id: tiktokOpenId,
-                tiktok_refresh_token: tiktokRefreshToken,
-                tiktok_access_token: tiktokAccessToken,
-            })
-        });
-
-        accountName.value = '';
-        accountNotes.value = '';
-        accountRefreshToken.value = '';
-        accountInstagramUserId.value = '';
-        accountInstagramToken.value = '';
-        accountTikTokOpenId.value = '';
-        accountTikTokRefreshToken.value = '';
-        accountTikTokAccessToken.value = '';
-        await loadAccounts();
-        await loadGroups(); // Refresh groups to show new account in add-to-group dropdowns
-    } catch (err) {
-        console.error('Failed to add account', err);
-    }
-};
-
-function updateAccountCredentialInputs() {
-    const isYoutube = accountPlatform.value === 'youtube';
-    const isInstagram = accountPlatform.value === 'instagram';
-    const isTikTok = accountPlatform.value === 'tiktok';
-    accountRefreshToken.disabled = !isYoutube;
-    accountYoutubePrivacy.disabled = !isYoutube;
-    accountInstagramUserId.disabled = !isInstagram;
-    accountInstagramToken.disabled = !isInstagram;
-    accountTikTokOpenId.disabled = !isTikTok;
-    accountTikTokRefreshToken.disabled = !isTikTok;
-    accountTikTokAccessToken.disabled = !isTikTok;
-    if (!isYoutube) {
-        accountRefreshToken.value = '';
-    }
-    if (!isInstagram) {
-        accountInstagramUserId.value = '';
-        accountInstagramToken.value = '';
-    }
-    if (!isTikTok) {
-        accountTikTokOpenId.value = '';
-        accountTikTokRefreshToken.value = '';
-        accountTikTokAccessToken.value = '';
-    }
-}
-
-accountPlatform.onchange = updateAccountCredentialInputs;
-
 function accountOptionsForPlatform(platform) {
     const filtered = accountsCache.filter(a => a.platform === platform);
-    if (!filtered.length) return '<option value="">No account</option>';
+    if (!filtered.length) return '<option value="">No accounts - add in Account Groups page</option>';
     return filtered.map(a => `<option value="${a.id}">${a.account_name}</option>`).join('');
 }
 
@@ -911,16 +705,6 @@ function showResults(data, processId) {
     refreshBackendRuntimeStatus();
 }
 
-navPipeline.onclick = (e) => {
-    e.preventDefault();
-    setSidebarView('pipeline');
-};
-
-navAccounts.onclick = (e) => {
-    e.preventDefault();
-    setSidebarView('accounts');
-};
-
 if (unloadBackendBtn) {
     unloadBackendBtn.onclick = async () => {
         try {
@@ -934,18 +718,7 @@ if (unloadBackendBtn) {
     };
 }
 
-// Group management event handlers
-addGroupBtn?.addEventListener('click', createGroup);
-
-toggleAccountFormBtn?.addEventListener('click', () => {
-    accountFormContainer?.classList.toggle('hidden');
-    const isHidden = accountFormContainer?.classList.contains('hidden');
-    toggleAccountFormBtn.innerText = isHidden ? '+ Add Account' : '- Hide Form';
-});
-
 // Initialize
 loadAccounts();
 loadGroups();
-updateAccountCredentialInputs();
-setSidebarView('pipeline');
 refreshBackendRuntimeStatus();

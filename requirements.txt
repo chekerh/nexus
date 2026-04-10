@@ -6,5 +6,6 @@ httpx
 ollama
 ffmpeg-python
 requests
+cryptography>=41.0.0
 # Optional experimental backend (enable with ANALYSIS_BACKEND=airllm)
 # airllm

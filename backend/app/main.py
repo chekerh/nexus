@@ -16,6 +16,7 @@ from .core.video_editor import cut_video
 from .core.account_store import AccountStore
 from .core.account_group_store import AccountGroupStore
 from .core.publisher import publish_clip, PublishHistoryStore, SUPPORTED_PLATFORMS
+from .core.security import auth_manager, log_audit, require_auth, verify_auth
 from .core.airllm_service import airllm_service
 from .core.drive_downloader import download_drive_file, extract_drive_file_id
 
@@ -89,6 +90,28 @@ class DriveProcessRequest(BaseModel):
     drive_url: str
 
 
+class AuthSetupRequest(BaseModel):
+    password: str
+
+
+class AuthVerifyRequest(BaseModel):
+    password: str
+
+
+class SessionResponse(BaseModel):
+    token: str
+    expires_in: int = 86400  # 24 hours
+
+
+# Allowed video file extensions and MIME types
+ALLOWED_EXTENSIONS = {'.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v', '.flv'}
+ALLOWED_MIME_TYPES = {
+    'video/mp4', 'video/quicktime', 'video/x-msvideo',
+    'video/x-matroska', 'video/webm', 'video/x-m4v', 'video/x-flv'
+}
+MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024  # 2GB
+
+
 def _sanitize_account(account: dict) -> dict:
     copy = dict(account)
     token = copy.get("oauth_refresh_token", "")
@@ -105,24 +128,149 @@ def _sanitize_account(account: dict) -> dict:
     copy.pop("tiktok_access_token", None)
     return copy
 
+
+def _validate_video_file(file: UploadFile) -> tuple[bool, str]:
+    """Validate uploaded video file for security."""
+    # Check file extension
+    filename = file.filename or ""
+    ext = os.path.splitext(filename.lower())[1]
+    if ext not in ALLOWED_EXTENSIONS:
+        return False, f"Invalid file extension. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+
+    # Check MIME type
+    content_type = file.content_type or ""
+    if content_type and content_type not in ALLOWED_MIME_TYPES:
+        # Some browsers may send generic MIME types, so we log but don't strictly enforce
+        print(f"Warning: Unusual MIME type {content_type} for {filename}")
+
+    # Check filename for path traversal
+    if '/' in filename or '\\' in filename or '..' in filename:
+        return False, "Invalid filename - path traversal detected"
+
+    return True, ""
+
+
+# Security API Endpoints
+@app.get("/auth/status")
+async def auth_status():
+    """Check if authentication is enabled."""
+    return {
+        "enabled": auth_manager.is_enabled(),
+        "message": "Password protection is " + ("enabled" if auth_manager.is_enabled() else "disabled")
+    }
+
+
+@app.post("/auth/setup")
+async def setup_auth(request: AuthSetupRequest):
+    """Set up password protection."""
+    if auth_manager.is_enabled():
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Authentication already enabled. Use change password endpoint."}
+        )
+
+    if len(request.password) < 8:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Password must be at least 8 characters"}
+        )
+
+    success = auth_manager.setup_password(request.password)
+    if success:
+        log_audit("auth_enabled", {"action": "password_setup"})
+        return {"message": "Password protection enabled"}
+    return JSONResponse(status_code=500, content={"error": "Failed to set up password"})
+
+
+@app.post("/auth/verify")
+async def verify_auth_endpoint(request: AuthVerifyRequest):
+    """Verify password and get session token."""
+    if not auth_manager.is_enabled():
+        return {"token": "no-auth-required", "expires_in": 0}
+
+    if verify_auth(request.password):
+        token = auth_manager.create_session()
+        log_audit("auth_login", {"success": True})
+        return {"token": token, "expires_in": 86400}
+    else:
+        log_audit("auth_login", {"success": False})
+        return JSONResponse(status_code=401, content={"error": "Invalid password"})
+
+
+@app.post("/auth/disable")
+async def disable_auth(request: AuthVerifyRequest):
+    """Disable password protection."""
+    if not auth_manager.is_enabled():
+        return {"message": "Authentication already disabled"}
+
+    if auth_manager.remove_password(request.password):
+        log_audit("auth_disabled", {"action": "password_removed"})
+        return {"message": "Password protection disabled"}
+    return JSONResponse(status_code=401, content={"error": "Invalid password"})
+
+
+@app.get("/audit/log")
+async def get_audit_log(limit: int = 100):
+    """Get recent audit log entries."""
+    return {"entries": log_audit(limit=limit)}
+
+
 @app.post("/process")
-async def process_video(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+async def process_video(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    endscreen_image: Optional[UploadFile] = File(None),
+    cta_text: Optional[str] = Form("Link in bio to try it free.")
+):
     """Uploads a video and triggers the AI pipeline."""
+    # Validate file
+    valid, error_msg = _validate_video_file(file)
+    if not valid:
+        log_audit("upload_rejected", {"filename": file.filename, "reason": error_msg}, success=False)
+        return JSONResponse(status_code=400, content={"error": error_msg})
+
     process_id = str(uuid.uuid4())
-    video_path = os.path.join(settings.UPLOAD_DIR, f"{process_id}_{file.filename}")
-    
+    # Sanitize filename
+    safe_filename = os.path.basename(file.filename or "video.mp4")
+    video_path = os.path.join(settings.UPLOAD_DIR, f"{process_id}_{safe_filename}")
+
+    # Check file size after writing
     with open(video_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
-    
+
+    file_size = os.path.getsize(video_path)
+    if file_size > MAX_FILE_SIZE:
+        os.remove(video_path)
+        log_audit("upload_rejected", {"filename": file.filename, "reason": "File too large"}, success=False)
+        return JSONResponse(status_code=400, content={"error": f"File too large. Max size: {MAX_FILE_SIZE / (1024*1024*1024):.1f}GB"})
+
+    log_audit("upload_accepted", {"process_id": process_id, "filename": file.filename, "size": file_size})
+
+    # Handle end screen image if provided
+    endscreen_path = None
+    if endscreen_image:
+        safe_img_name = os.path.basename(endscreen_image.filename or "endscreen.jpg")
+        endscreen_path = os.path.join(settings.UPLOAD_DIR, f"{process_id}_endscreen_{safe_img_name}")
+        with open(endscreen_path, "wb") as buffer:
+            shutil.copyfileobj(endscreen_image.file, buffer)
+
     processing_results[process_id] = {
-        "status": "Starting...", 
+        "status": "Starting...",
         "thinking": ["System online. Preparing neural pathways..."],
         "filename": file.filename,
-        "cancelled": False
+        "cancelled": False,
+        "has_endscreen": endscreen_path is not None,
+        "cta_text": cta_text or "Link in bio to try it free."
     }
-    
+
     # We use a regular def for run_pipeline so it runs in a separate thread
-    background_tasks.add_task(run_pipeline_sync, process_id, video_path)
+    background_tasks.add_task(
+        run_pipeline_sync,
+        process_id,
+        video_path,
+        endscreen_path=endscreen_path,
+        cta_text=cta_text or "Link in bio to try it free."
+    )
     return {"process_id": process_id}
 
 @app.post("/process-drive")
