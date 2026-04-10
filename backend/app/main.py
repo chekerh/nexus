@@ -14,6 +14,7 @@ from .core.transcriber import transcribe_video
 from .core.analyst import analyze_transcript
 from .core.video_editor import cut_video
 from .core.account_store import AccountStore
+from .core.account_group_store import AccountGroupStore
 from .core.publisher import publish_clip, PublishHistoryStore, SUPPORTED_PLATFORMS
 from .core.airllm_service import airllm_service
 from .core.drive_downloader import download_drive_file, extract_drive_file_id
@@ -37,6 +38,7 @@ app.add_middleware(
 processing_results = {}
 active_pids = {} # {process_id: pid}
 account_store = AccountStore(settings.ACCOUNTS_DB_PATH)
+account_group_store = AccountGroupStore(settings.ACCOUNT_GROUPS_DB_PATH)
 publish_history_store = PublishHistoryStore(settings.PUBLISH_LOG_PATH)
 
 
@@ -69,6 +71,18 @@ class PublishRequest(BaseModel):
     clip_filename: str
     title: str
     description: str = ""
+
+
+class AccountGroupCreate(BaseModel):
+    name: str
+    description: str = ""
+    account_ids: list = []
+
+
+class AccountGroupUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    account_ids: list | None = None
 
 
 class DriveProcessRequest(BaseModel):
@@ -210,6 +224,92 @@ async def delete_account(account_id: str):
     if not ok:
         return JSONResponse(status_code=404, content={"error": "Account not found"})
     return {"status": "deleted"}
+
+
+# Account Groups API
+@app.get("/account-groups")
+async def list_account_groups():
+    """List all account groups with their associated accounts."""
+    groups = account_group_store.list_groups()
+    all_accounts = account_store.list_accounts()
+    account_map = {a["id"]: a for a in all_accounts}
+
+    result = []
+    for group in groups:
+        enriched = dict(group)
+        enriched["accounts"] = [
+            _sanitize_account(account_map.get(aid, {}))
+            for aid in group.get("account_ids", [])
+            if aid in account_map
+        ]
+        result.append(enriched)
+    return {"groups": result}
+
+
+@app.post("/account-groups")
+async def create_account_group(payload: AccountGroupCreate):
+    """Create a new account group."""
+    group = account_group_store.create_group({
+        "name": payload.name.strip(),
+        "description": payload.description.strip(),
+        "account_ids": payload.account_ids,
+        "created_at": datetime.now(UTC).isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
+    })
+    return {"group": group}
+
+
+@app.put("/account-groups/{group_id}")
+async def update_account_group(group_id: str, payload: AccountGroupUpdate):
+    """Update an account group."""
+    updates = {}
+    if payload.name is not None:
+        updates["name"] = payload.name.strip()
+    if payload.description is not None:
+        updates["description"] = payload.description.strip()
+    if payload.account_ids is not None:
+        updates["account_ids"] = payload.account_ids
+    updates["updated_at"] = datetime.now(UTC).isoformat()
+
+    group = account_group_store.update_group(group_id, updates)
+    if not group:
+        return JSONResponse(status_code=404, content={"error": "Group not found"})
+    return {"group": group}
+
+
+@app.delete("/account-groups/{group_id}")
+async def delete_account_group(group_id: str):
+    """Delete an account group."""
+    ok = account_group_store.delete_group(group_id)
+    if not ok:
+        return JSONResponse(status_code=404, content={"error": "Group not found"})
+    return {"status": "deleted"}
+
+
+@app.post("/account-groups/{group_id}/accounts/{account_id}")
+async def add_account_to_group(group_id: str, account_id: str):
+    """Add an account to a group."""
+    # Verify both exist
+    group = account_group_store.get_group(group_id)
+    account = account_store.get_account(account_id)
+    if not group:
+        return JSONResponse(status_code=404, content={"error": "Group not found"})
+    if not account:
+        return JSONResponse(status_code=404, content={"error": "Account not found"})
+
+    ok = account_group_store.add_account_to_group(group_id, account_id)
+    if not ok:
+        return JSONResponse(status_code=400, content={"error": "Failed to add account to group"})
+    return {"status": "added"}
+
+
+@app.delete("/account-groups/{group_id}/accounts/{account_id}")
+async def remove_account_from_group(group_id: str, account_id: str):
+    """Remove an account from a group."""
+    ok = account_group_store.remove_account_from_group(group_id, account_id)
+    if not ok:
+        return JSONResponse(status_code=404, content={"error": "Group or account not found"})
+    return {"status": "removed"}
 
 
 @app.get("/publish/history")

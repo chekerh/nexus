@@ -29,7 +29,28 @@
             <section class="card accounts-section sidebar-accounts hidden" id="sidebar-accounts-panel">
                 <h3>Account Groups</h3>
                 <p class="accounts-subtitle">Manage posting accounts for TikTok, Instagram, and YouTube.</p>
-                <div class="account-form-grid">
+
+                <!-- Groups Section -->
+                <div class="groups-section">
+                    <h4>Account Groups</h4>
+                    <p class="input-hint">Create groups to organize accounts (e.g., "Personal", "Brand", "Clients")</p>
+                    <div class="group-form">
+                        <input id="group-name" type="text" placeholder="Group name (e.g. Personal Accounts)">
+                        <input id="group-description" type="text" placeholder="Description (optional)">
+                        <button class="btn btn-secondary" id="add-group-btn">Create Group</button>
+                    </div>
+                    <div id="groups-list" class="groups-list"></div>
+                </div>
+
+                <hr class="section-divider">
+
+                <!-- Individual Accounts Section -->
+                <div class="accounts-section-header">
+                    <h4>Individual Accounts</h4>
+                    <button class="btn btn-sm btn-secondary" id="toggle-account-form">+ Add Account</button>
+                </div>
+
+                <div id="account-form-container" class="account-form-grid hidden">
                     <select id="account-platform">
                         <option value="tiktok">TikTok</option>
                         <option value="instagram">Instagram</option>
@@ -73,19 +94,33 @@
             <!-- Upload Section -->
             <section class="upload-section card">
                 <div class="input-tabs">
-                    <button class="tab-btn active" id="tab-file" data-tab="file">Upload File</button>
-                    <button class="tab-btn" id="tab-drive" data-tab="drive">Google Drive</button>
+                    <button class="tab-btn active" id="tab-file" data-tab="file">
+                        <span class="tab-icon">📤</span> Upload File
+                    </button>
+                    <button class="tab-btn" id="tab-drive" data-tab="drive">
+                        <span class="tab-icon">☁️</span> Google Drive
+                    </button>
                 </div>
                 
                 <div class="tab-content active" id="content-file">
+                    <div class="drive-section-header">
+                        <div class="drive-icon" style="background: linear-gradient(135deg, #5dd7ff, #6c7cff);">📹</div>
+                        <span class="drive-section-title">Upload Local Video</span>
+                    </div>
                     <div class="upload-dropzone" id="dropzone">
-                        <p>Drag and drop your video file or click to browse.</p>
+                        <div class="dropzone-icon">📂</div>
+                        <p class="dropzone-text">Drag and drop your video file or click to browse</p>
+                        <p class="dropzone-hint">Supports MP4, MOV, AVI, MKV, WebM</p>
                         <input type="file" id="file-input" accept="video/*" hidden>
                     </div>
                     <button class="btn btn-primary" id="process-btn" disabled>Start Analysis</button>
                 </div>
                 
                 <div class="tab-content" id="content-drive">
+                    <div class="drive-section-header">
+                        <div class="drive-icon">📁</div>
+                        <span class="drive-section-title">Import from Google Drive</span>
+                    </div>
                     <div class="drive-input-wrapper">
                         <input type="text" id="drive-url" class="drive-input" placeholder="Paste Google Drive shareable link (e.g., https://drive.google.com/file/d/...)">
                         <p class="input-hint">Make sure the file is shared with "Anyone with the link can view"</p>

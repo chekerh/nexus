@@ -32,6 +32,14 @@ const accountTikTokAccessToken = document.getElementById('account-tiktok-access-
 const accountsList = document.getElementById('accounts-list');
 const publishConsole = document.getElementById('publish-console');
 
+// Account Groups Elements
+const groupName = document.getElementById('group-name');
+const groupDescription = document.getElementById('group-description');
+const addGroupBtn = document.getElementById('add-group-btn');
+const groupsList = document.getElementById('groups-list');
+const toggleAccountFormBtn = document.getElementById('toggle-account-form');
+const accountFormContainer = document.getElementById('account-form-container');
+
 // Google Drive elements
 const tabFile = document.getElementById('tab-file');
 const tabDrive = document.getElementById('tab-drive');
@@ -43,6 +51,7 @@ const processDriveBtn = document.getElementById('process-drive-btn');
 let selectedFile = null;
 let currentProcessId = null;
 let accountsCache = [];
+let groupsCache = [];
 let statusTimerInterval = null;
 let statusStartMs = 0;
 
@@ -311,6 +320,140 @@ async function loadAccounts() {
     }
 }
 
+async function loadGroups() {
+    try {
+        const res = await fetch('/account-groups');
+        const data = await res.json();
+        groupsCache = data.groups || [];
+        renderGroupsList();
+    } catch (err) {
+        console.error('Failed to load groups', err);
+    }
+}
+
+function renderGroupsList() {
+    if (!groupsList) return;
+
+    if (!groupsCache.length) {
+        groupsList.innerHTML = '<p class="account-empty">No groups created yet. Create a group to organize your accounts.</p>';
+        return;
+    }
+
+    groupsList.innerHTML = groupsCache.map(group => {
+        const accounts = group.accounts || [];
+        const accountChips = accounts.map(acc => `
+            <span class="group-account-chip">
+                ${acc.account_name}
+                <button onclick="removeAccountFromGroup('${group.id}', '${acc.id}')" title="Remove from group">×</button>
+            </span>
+        `).join('');
+
+        const ungroupedAccounts = accountsCache.filter(a =>
+            !accounts.some(g => g.id === a.id) &&
+            a.platform === (group.targetPlatform || a.platform)
+        );
+
+        const addToGroupForm = ungroupedAccounts.length > 0 ? `
+            <div class="add-to-group-form">
+                <select id="add-to-group-${group.id}">
+                    <option value="">Add account...</option>
+                    ${ungroupedAccounts.map(a => `<option value="${a.id}">${a.account_name} (${a.platform})</option>`).join('')}
+                </select>
+                <button class="btn btn-xs btn-add-account" onclick="addAccountToGroup('${group.id}')">Add</button>
+            </div>
+        ` : '';
+
+        return `
+            <div class="group-row" data-group-id="${group.id}">
+                <div class="group-header">
+                    <div>
+                        <span class="group-name">${group.name}</span>
+                        ${group.description ? `<span class="group-description"> - ${group.description}</span>` : ''}
+                    </div>
+                    <div class="group-actions">
+                        <button class="btn btn-xs btn-danger" onclick="deleteGroup('${group.id}')">Delete</button>
+                    </div>
+                </div>
+                ${accounts.length > 0 ? `
+                    <div class="group-accounts">
+                        ${accountChips}
+                    </div>
+                ` : '<div class="group-accounts"><span style="color: var(--muted); font-size: .75rem;">No accounts in this group yet.</span></div>'}
+                ${addToGroupForm}
+            </div>
+        `;
+    }).join('');
+}
+
+async function createGroup() {
+    const name = groupName?.value?.trim();
+    const description = groupDescription?.value?.trim();
+
+    if (!name) {
+        showToast('Error', 'Please enter a group name');
+        return;
+    }
+
+    try {
+        await fetch('/account-groups', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, description, account_ids: [] })
+        });
+
+        groupName.value = '';
+        groupDescription.value = '';
+        await loadGroups();
+        showToast('Success', `Group "${name}" created`);
+    } catch (err) {
+        console.error('Failed to create group', err);
+        showToast('Error', 'Failed to create group');
+    }
+}
+
+async function deleteGroup(groupId) {
+    if (!confirm('Delete this group? Accounts will not be deleted.')) return;
+
+    try {
+        await fetch(`/account-groups/${groupId}`, { method: 'DELETE' });
+        await loadGroups();
+        showToast('Success', 'Group deleted');
+    } catch (err) {
+        console.error('Failed to delete group', err);
+        showToast('Error', 'Failed to delete group');
+    }
+}
+
+async function addAccountToGroup(groupId) {
+    const select = document.getElementById(`add-to-group-${groupId}`);
+    const accountId = select?.value;
+
+    if (!accountId) {
+        showToast('Error', 'Please select an account');
+        return;
+    }
+
+    try {
+        await fetch(`/account-groups/${groupId}/accounts/${accountId}`, { method: 'POST' });
+        await loadGroups();
+        showToast('Success', 'Account added to group');
+    } catch (err) {
+        console.error('Failed to add account to group', err);
+        showToast('Error', 'Failed to add account to group');
+    }
+}
+
+async function removeAccountFromGroup(groupId, accountId) {
+    try {
+        await fetch(`/account-groups/${groupId}/accounts/${accountId}`, { method: 'DELETE' });
+        await loadGroups();
+        showToast('Success', 'Account removed from group');
+    } catch (err) {
+        console.error('Failed to remove account from group', err);
+        showToast('Error', 'Failed to remove account from group');
+    }
+}
+
 function renderAccountsList() {
     if (!accountsCache.length) {
         accountsList.innerHTML = '<p class="account-empty">No accounts added yet.</p>';
@@ -335,6 +478,7 @@ function renderAccountsList() {
             const id = btn.getAttribute('data-account-id');
             await fetch(`/accounts/${id}`, { method: 'DELETE' });
             await loadAccounts();
+            await loadGroups(); // Refresh groups to reflect account removal
         };
     });
 }
@@ -381,6 +525,7 @@ addAccountBtn.onclick = async () => {
         accountTikTokRefreshToken.value = '';
         accountTikTokAccessToken.value = '';
         await loadAccounts();
+        await loadGroups(); // Refresh groups to show new account in add-to-group dropdowns
     } catch (err) {
         console.error('Failed to add account', err);
     }
@@ -424,16 +569,22 @@ async function publishClip(index) {
     const accountEl = document.getElementById(`account-${index}`);
     const titleEl = document.getElementById(`title-${index}`);
     const descEl = document.getElementById(`desc-${index}`);
+    const ctaEl = document.getElementById(`cta-${index}`);
     const clip = document.getElementById(`clip-${index}`)?.getAttribute('data-filename');
 
     if (!clip) return;
+
+    // Combine description with CTA
+    const mainDesc = descEl.value.trim();
+    const ctaText = ctaEl ? ctaEl.value.trim() : "";
+    const fullDescription = ctaText ? `${mainDesc}\n\n${ctaText}` : mainDesc;
 
     const payload = {
         platform: platformEl.value,
         account_id: accountEl.value,
         clip_filename: clip,
         title: titleEl.value.trim(),
-        description: descEl.value.trim()
+        description: fullDescription
     };
 
     if (!payload.account_id) {
@@ -466,7 +617,71 @@ async function publishClip(index) {
     }
 }
 
+async function publishClipToGroup(index) {
+    const groupSelect = document.getElementById(`group-select-${index}`);
+    const groupId = groupSelect?.value;
+    const titleEl = document.getElementById(`title-${index}`);
+    const descEl = document.getElementById(`desc-${index}`);
+    const clip = document.getElementById(`clip-${index}`)?.getAttribute('data-filename');
+
+    if (!clip) return;
+
+    if (!groupId) {
+        publishConsole.innerHTML = '<div class="publish-line error">Select a group to publish to.</div>';
+        return;
+    }
+
+    const group = groupsCache.find(g => g.id === groupId);
+    if (!group || !group.accounts || group.accounts.length === 0) {
+        publishConsole.innerHTML = '<div class="publish-line error">Selected group has no accounts.</div>';
+        return;
+    }
+
+    const title = titleEl.value.trim();
+    const description = descEl.value.trim();
+
+    publishConsole.innerHTML = `<div class="publish-line">Publishing to ${group.accounts.length} accounts in group "${group.name}"...</div>`;
+
+    const results = [];
+    for (const account of group.accounts) {
+        try {
+            const res = await fetch('/publish', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    platform: account.platform,
+                    account_id: account.id,
+                    clip_filename: clip,
+                    title: title,
+                    description: description
+                })
+            });
+
+            const data = await res.json();
+            results.push({ account: account.account_name, platform: account.platform, success: res.ok, data });
+
+            if (!res.ok) {
+                publishConsole.innerHTML += `<div class="publish-line error">Failed for ${account.account_name}: ${data.error || 'Unknown error'}</div>`;
+            } else {
+                const result = data.publish.result;
+                if (result.upload_url) {
+                    publishConsole.innerHTML += `<div class="publish-line">${account.account_name} (${account.platform}): <a href="${result.upload_url}" target="_blank">Open upload</a></div>`;
+                } else {
+                    publishConsole.innerHTML += `<div class="publish-line">${account.account_name} (${account.platform}): Published successfully</div>`;
+                }
+            }
+        } catch (err) {
+            results.push({ account: account.account_name, platform: account.platform, success: false, error: err.message });
+            publishConsole.innerHTML += `<div class="publish-line error">Error for ${account.account_name}: ${err.message}</div>`;
+        }
+    }
+
+    const successCount = results.filter(r => r.success).length;
+    publishConsole.innerHTML += `<div class="publish-line">Complete: ${successCount}/${group.accounts.length} accounts processed.</div>`;
+}
+
 function bindClipPublishActions() {
+    // Platform select for single account mode
     document.querySelectorAll('.platform-select').forEach(select => {
         select.onchange = () => {
             const idx = select.getAttribute('data-index');
@@ -475,8 +690,61 @@ function bindClipPublishActions() {
         };
     });
 
+    // Single account publish buttons
     document.querySelectorAll('.publish-btn').forEach(btn => {
         btn.onclick = () => publishClip(btn.getAttribute('data-index'));
+    });
+
+    // Publish mode tabs (single vs group)
+    document.querySelectorAll('.publish-mode-tab').forEach(tab => {
+        tab.onclick = () => {
+            const idx = tab.getAttribute('data-index');
+            const mode = tab.getAttribute('data-mode');
+
+            // Update active tab
+            document.querySelectorAll(`.publish-mode-tab[data-index="${idx}"]`).forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            // Show/hide sections
+            const singleSection = document.getElementById(`publish-single-${idx}`);
+            const groupSection = document.getElementById(`publish-group-${idx}`);
+
+            if (mode === 'single') {
+                singleSection.classList.remove('hidden');
+                groupSection.classList.add('hidden');
+            } else {
+                singleSection.classList.add('hidden');
+                groupSection.classList.remove('hidden');
+            }
+        };
+    });
+
+    // Group select change - update preview
+    document.querySelectorAll('[id^="group-select-"]').forEach(select => {
+        select.onchange = () => {
+            const idx = select.id.replace('group-select-', '');
+            const groupId = select.value;
+            const previewEl = document.getElementById(`group-accounts-preview-${idx}`);
+
+            if (!groupId) {
+                previewEl.innerHTML = '';
+                return;
+            }
+
+            const group = groupsCache.find(g => g.id === groupId);
+            if (group && group.accounts) {
+                previewEl.innerHTML = group.accounts.map(a =>
+                    `<span class="account-chip">${a.account_name} (${a.platform})</span>`
+                ).join('');
+            } else {
+                previewEl.innerHTML = '';
+            }
+        };
+    });
+
+    // Group publish buttons
+    document.querySelectorAll('.publish-group-btn').forEach(btn => {
+        btn.onclick = () => publishClipToGroup(btn.getAttribute('data-index'));
     });
 }
 
@@ -573,6 +841,12 @@ function showResults(data, processId) {
             const vtt = encodeURIComponent(clip.replace(/\.mp4$/i, '.vtt'));
             const defaultTitle = hook.hook_name || `Clip ${index + 1}`;
             const defaultDesc = hook.caption || '';
+
+            const hasGroups = groupsCache.length > 0;
+            const groupOptions = hasGroups
+                ? groupsCache.map(g => `<option value="${g.id}">${g.name} (${g.accounts?.length || 0} accounts)</option>`).join('')
+                : '<option value="">No groups - create one first</option>';
+
             return `
                 <div class="card clip-card" id="clip-${index}" data-filename="${clip}">
                     <h4>${hook.hook_name}</h4>
@@ -587,13 +861,37 @@ function showResults(data, processId) {
                         <a href="/video_clips/${encodedClip}" download class="btn btn-secondary">Download Clip</a>
                         <input id="title-${index}" class="publish-input" value="${defaultTitle.replaceAll('"', '&quot;')}">
                         <textarea id="desc-${index}" class="publish-textarea">${defaultDesc}</textarea>
-                        <select id="platform-${index}" class="publish-select platform-select" data-index="${index}">
-                            <option value="tiktok">TikTok</option>
-                            <option value="instagram">Instagram</option>
-                            <option value="youtube">YouTube</option>
-                        </select>
-                        <select id="account-${index}" class="publish-select">${accountOptionsForPlatform('tiktok')}</select>
-                        <button class="btn btn-primary publish-btn" data-index="${index}">Post via Selected Account</button>
+
+                        <div class="publish-section">
+                            <div class="publish-section-title">Publish To</div>
+                            <div class="publish-mode-tabs">
+                                <button class="publish-mode-tab active" data-mode="single" data-index="${index}">Single Account</button>
+                                <button class="publish-mode-tab ${!hasGroups ? 'disabled' : ''}" data-mode="group" data-index="${index}">Account Group</button>
+                            </div>
+
+                            <div id="publish-single-${index}" class="publish-single-section">
+                                <select id="platform-${index}" class="publish-select platform-select" data-index="${index}">
+                                    <option value="tiktok">TikTok</option>
+                                    <option value="instagram">Instagram</option>
+                                    <option value="youtube">YouTube</option>
+                                </select>
+                                <select id="account-${index}" class="publish-select">${accountOptionsForPlatform('tiktok')}</select>
+                                <button class="btn btn-primary publish-btn" data-index="${index}">Post to Account</button>
+                            </div>
+
+                            <div id="publish-group-${index}" class="publish-group-section hidden">
+                                <div class="publish-group-select">
+                                    <select id="group-select-${index}">
+                                        <option value="">Select a group...</option>
+                                        ${groupOptions}
+                                    </select>
+                                </div>
+                                <div id="group-accounts-preview-${index}" class="group-accounts-preview"></div>
+                                <button class="btn btn-publish-multi publish-group-btn" data-index="${index}" ${!hasGroups ? 'disabled' : ''}>
+                                    Post to All Accounts in Group
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             `;
@@ -636,7 +934,18 @@ if (unloadBackendBtn) {
     };
 }
 
+// Group management event handlers
+addGroupBtn?.addEventListener('click', createGroup);
+
+toggleAccountFormBtn?.addEventListener('click', () => {
+    accountFormContainer?.classList.toggle('hidden');
+    const isHidden = accountFormContainer?.classList.contains('hidden');
+    toggleAccountFormBtn.innerText = isHidden ? '+ Add Account' : '- Hide Form';
+});
+
+// Initialize
 loadAccounts();
+loadGroups();
 updateAccountCredentialInputs();
 setSidebarView('pipeline');
 refreshBackendRuntimeStatus();

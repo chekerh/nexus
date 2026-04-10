@@ -46,6 +46,11 @@ def _normalize_hooks(raw_hooks: List[Dict]) -> List[Dict]:
     min_len = settings.CLIP_MIN_SECONDS
     max_len = settings.CLIP_MAX_SECONDS
 
+    # Get CTA text to append to captions
+    cta_text = ""
+    if settings.CAPTION_CTA_ENABLED and settings.CAPTION_CTA_DEFAULT_TEXT:
+        cta_text = settings.CAPTION_CTA_DEFAULT_TEXT.strip()
+
     for i, hook in enumerate(raw_hooks or []):
         start = _to_float(hook.get("start", 0.0), 0.0)
         end = _to_float(hook.get("end", start), start)
@@ -60,11 +65,18 @@ def _normalize_hooks(raw_hooks: List[Dict]) -> List[Dict]:
         if duration > max_len:
             end = start + max_len
 
+        # Build caption with optional CTA
+        caption = hook.get("caption") or ""
+        if cta_text and caption:
+            caption = f"{caption}\n\n{cta_text}"
+        elif cta_text:
+            caption = cta_text
+
         normalized.append({
             "start": round(max(0.0, start), 2),
             "end": round(max(0.0, end), 2),
             "hook_name": hook.get("hook_name") or f"Hook {i + 1}",
-            "caption": hook.get("caption") or "",
+            "caption": caption,
             "confidence": round(_to_float(hook.get("confidence", 0.5), 0.5), 2),
         })
 

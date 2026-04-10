@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = str(BASE_DIR / "backend" / "data")
     FRONTEND_DIR: str = str(BASE_DIR / "frontend")
     ACCOUNTS_DB_PATH: str = str(BASE_DIR / "backend" / "data" / "accounts.json")
+    ACCOUNT_GROUPS_DB_PATH: str = str(BASE_DIR / "backend" / "data" / "account_groups.json")
     PUBLISH_LOG_PATH: str = str(BASE_DIR / "backend" / "data" / "publish_history.json")
     YOUTUBE_CLIENT_ID: str = ""
     YOUTUBE_CLIENT_SECRET: str = ""
