@@ -47,26 +47,61 @@ def download_drive_file(url: str, output_dir: str, progress_callback=None) -> Op
     if progress_callback:
         progress_callback(f"Drive: Extracted file ID {file_id[:8]}...")
     
-    # Direct download URL
+    # Use the newer Google Drive API download URL
     download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
     
     session = requests.Session()
+    session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    })
     
     if progress_callback:
-        progress_callback("Drive: Initiating download...")
+        progress_callback("Drive: Requesting file...")
     
-    response = session.get(download_url, stream=True)
+    # First request to get cookies and check for confirmation
+    response = session.get(download_url, stream=True, allow_redirects=True)
     
-    # Check for confirmation page (large files trigger this)
-    if response.headers.get('content-type', '').startswith('text/html'):
-        # Need to confirm download for large files
-        for key, value in response.cookies.items():
-            if key.startswith('download_warning'):
-                confirm_url = f"https://drive.google.com/uc?export=download&id={file_id}&confirm={value}"
-                if progress_callback:
-                    progress_callback("Drive: Confirming large file download...")
-                response = session.get(confirm_url, stream=True)
-                break
+    # Check for virus scan warning or large file confirmation
+    content_type = response.headers.get('content-type', '')
+    
+    # Google Drive returns HTML page for virus scan warnings
+    if 'text/html' in content_type or response.headers.get('content-length') == '0':
+        # Read first chunk to check if it's HTML warning
+        first_chunk = next(response.iter_content(2048), b'')
+        
+        if b'confirm' in first_chunk or b'virus' in first_chunk or b'download_warning' in first_chunk:
+            if progress_callback:
+                progress_callback("Drive: Confirming download (virus scan warning)...")
+            
+            # Get confirm token from cookies
+            confirm_token = None
+            for key, value in response.cookies.items():
+                if key.startswith('download_warning'):
+                    confirm_token = value
+                    break
+            
+            # If no cookie, try to extract from HTML
+            if not confirm_token:
+                match = re.search(r'confirm=([a-zA-Z0-9_\-]+)', first_chunk.decode('utf-8', errors='ignore'))
+                if match:
+                    confirm_token = match.group(1)
+            
+            if confirm_token:
+                confirm_url = f"https://drive.google.com/uc?export=download&id={file_id}&confirm={confirm_token}"
+                response = session.get(confirm_url, stream=True, allow_redirects=True)
+            else:
+                # Try alternative approach - get confirm from form
+                confirm_url = f"https://drive.google.com/uc?export=download&id={file_id}&confirm=t"
+                response = session.get(confirm_url, stream=True, allow_redirects=True)
+    
+    # Check if we got actual file data
+    content_type = response.headers.get('content-type', '')
+    total_size = int(response.headers.get('content-length', 0))
+    
+    if total_size == 0 and 'text/html' in content_type:
+        if progress_callback:
+            progress_callback("Drive: ERROR - Could not download file. File may be too large or require permissions.")
+        return None
     
     # Get filename from Content-Disposition header or use default
     filename = None
@@ -87,7 +122,6 @@ def download_drive_file(url: str, output_dir: str, progress_callback=None) -> Op
     output_path = os.path.join(output_dir, f"{uuid.uuid4()}_{filename}")
     
     # Download with progress
-    total_size = int(response.headers.get('content-length', 0))
     downloaded = 0
     chunk_size = 8192
     
@@ -105,5 +139,13 @@ def download_drive_file(url: str, output_dir: str, progress_callback=None) -> Op
     
     if progress_callback:
         progress_callback(f"Drive: Download complete ({downloaded / 1024 / 1024:.1f} MB)")
+    
+    # Verify downloaded file is not empty
+    if downloaded == 0:
+        if progress_callback:
+            progress_callback("Drive: ERROR - Downloaded file is empty")
+        if os.path.exists(output_path):
+            os.remove(output_path)
+        return None
     
     return output_path

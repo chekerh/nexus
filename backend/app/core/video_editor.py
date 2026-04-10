@@ -435,8 +435,8 @@ def _build_cta_text_overlay(duration: float, cta_text: str) -> Optional[str]:
     # Show CTA in last 3 seconds or 20% of clip, whichever is longer (min 2s, max 4s)
     show_duration = max(2.0, min(4.0, duration * 0.2, duration))
     show_start = max(0.0, duration - show_duration)
-    # Escape text for FFmpeg drawtext
-    escaped_text = cta_text.replace("'", "'\\\=''").replace(":", "\\:")
+    # Escape text for FFmpeg drawtext: escape single quotes and colons
+    escaped_text = cta_text.replace("'", "\\'").replace(":", "\\:")
     # CTA styling: bold white text with dark outline, centered bottom
     return (
         f"drawtext=text='{escaped_text}':"
@@ -444,12 +444,72 @@ def _build_cta_text_overlay(duration: float, cta_text: str) -> Optional[str]:
         f"fontsize=32:fontcolor=white:"
         f"borderw=4:bordercolor=black@0.8:"
         f"x=(w-text_w)/2:y=h-text_h-40:"
-        f"enable='between(t,{show_start:.2f},{duration:.2f})'"
+        f"enable='between(t\\,{show_start:.2f}\\,{duration:.2f})'"
     )
 
 
-def _build_ffmpeg_command(video_path: str, start: float, duration: float, output_path: str, subtitle_path: Optional[str], transcript_segments: List[Dict], process_id: str = None, thought_callback=None, clip_index: int = 0, enable_format: bool = True, enable_transitions: bool = True, enable_zoom: bool = True, enable_subtitles: bool = True, animated_captions: bool = True, cta_text: str = "") -> List[str]:
-    cmd = ["ffmpeg", "-y", "-ss", str(start), "-t", str(duration)]
+def _build_caption_drawtext_filters(transcript_segments: List[Dict], clip_start: float, clip_end: float, max_words: int = 5) -> List[str]:
+    """Build multiple drawtext filters for caption burn-in when subtitles filter is unavailable."""
+    filters = []
+
+    for seg in transcript_segments:
+        seg_start = seg.get("start", 0.0)
+        seg_end = seg.get("end", 0.0)
+
+        # Check if segment overlaps with clip
+        overlap_start = max(seg_start, clip_start)
+        overlap_end = min(seg_end, clip_end)
+
+        if overlap_start >= overlap_end:
+            continue
+
+        # Calculate relative timing within clip
+        rel_start = overlap_start - clip_start
+        rel_end = overlap_end - clip_start
+
+        # Split text into chunks
+        text = seg.get("text", "").strip()
+        if not text:
+            continue
+
+        words = text.split()
+        if len(words) > max_words:
+            # Split into chunks
+            chunks = []
+            for i in range(0, len(words), max_words):
+                chunk = " ".join(words[i:i+max_words])
+                chunks.append(chunk)
+        else:
+            chunks = [text]
+
+        # Create drawtext filter for each chunk
+        chunk_duration = (rel_end - rel_start) / max(1, len(chunks))
+
+        for idx, chunk in enumerate(chunks):
+            chunk_start = rel_start + idx * chunk_duration
+            chunk_end = min(rel_end, chunk_start + chunk_duration)
+
+            if chunk_end <= chunk_start:
+                continue
+
+            # Escape text for FFmpeg: escape single quotes and colons
+            escaped = chunk.replace("'", "\\'").replace(":", "\\:")
+
+            filter_str = (
+                f"drawtext=text='{escaped}':"
+                f"fontfile=/System/Library/Fonts/Helvetica.ttc:"
+                f"fontsize=28:fontcolor=white:"
+                f"borderw=3:bordercolor=black@0.8:"
+                f"x=(w-text_w)/2:y=h-text_h-80:"
+                f"enable='between(t\\,{chunk_start:.2f}\\,{chunk_end:.2f})'"
+            )
+            filters.append(filter_str)
+
+    return filters
+
+
+def _build_ffmpeg_command(video_path: str, start: float, duration: float, output_path: str, subtitle_path: Optional[str], transcript_segments: List[Dict], process_id: str = None, thought_callback=None, clip_index: int = 0, enable_format: bool = True, enable_transitions: bool = True, enable_zoom: bool = True, enable_subtitles: bool = True, animated_captions: bool = True, cta_text: str = "", enable_cta: bool = True) -> List[str]:
+    cmd = ["ffmpeg", "-y", "-ss", str(start), "-t", str(duration), "-i", video_path]
     vf_parts = _get_format_preset_filters() if enable_format else []
     af_parts = []
 
@@ -471,43 +531,68 @@ def _build_ffmpeg_command(video_path: str, start: float, duration: float, output
             f"scale=iw*{zoom_max}:ih*{zoom_max},crop=iw/{zoom_max}:ih/{zoom_max}"
         )
 
-    if enable_subtitles and settings.CLIP_ENABLE_SUBTITLES and transcript_segments and subtitle_path:
-        subtitle_written = False
-        if animated_captions and settings.CLIP_ENABLE_ANIMATED_CAPTIONS:
-            subtitle_written = _write_clip_ass(
-                subtitle_path,
-                transcript_segments,
-                clip_start=start,
-                clip_end=start + duration,
-                max_words=max(3, settings.CLIP_SUBTITLE_MAX_WORDS),
-                font_size=max(26, settings.CLIP_CAPTION_FONT_SIZE),
-                process_id=process_id,
-                thought_callback=thought_callback,
-                clip_index=clip_index,
-            )
-        else:
-            subtitle_written = _write_clip_srt(
-                subtitle_path,
-                transcript_segments,
-                clip_start=start,
-                clip_end=start + duration,
-                max_words=max(3, settings.CLIP_SUBTITLE_MAX_WORDS),
-            )
+    # Handle subtitle/caption burn-in
+    if settings.CLIP_ENABLE_SUBTITLES and transcript_segments:
+        # Check which filters are available
+        can_subtitles = _ffmpeg_supports_filter("subtitles")
+        can_drawtext = _ffmpeg_supports_filter("drawtext")
 
-        if subtitle_written:
-            preset = SUBTITLE_PRESETS.get(settings.CLIP_SUBTITLE_PRESET, SUBTITLE_PRESETS["bold_center"])
-            escaped_sub_path = _escape_filter_path(subtitle_path)
+        if enable_subtitles and can_subtitles and subtitle_path:
+            # Use subtitles filter (best quality with styling)
+            subtitle_written = False
             if animated_captions and settings.CLIP_ENABLE_ANIMATED_CAPTIONS:
-                vf_parts.append(f"subtitles='{escaped_sub_path}'")
+                subtitle_written = _write_clip_ass(
+                    subtitle_path,
+                    transcript_segments,
+                    clip_start=start,
+                    clip_end=start + duration,
+                    max_words=max(3, settings.CLIP_SUBTITLE_MAX_WORDS),
+                    font_size=max(26, settings.CLIP_CAPTION_FONT_SIZE),
+                    process_id=process_id,
+                    thought_callback=thought_callback,
+                    clip_index=clip_index,
+                )
             else:
-                vf_parts.append(f"subtitles='{escaped_sub_path}':force_style='{preset}'")
+                subtitle_written = _write_clip_srt(
+                    subtitle_path,
+                    transcript_segments,
+                    clip_start=start,
+                    clip_end=start + duration,
+                    max_words=max(3, settings.CLIP_SUBTITLE_MAX_WORDS),
+                )
+
+            if subtitle_written:
+                preset = SUBTITLE_PRESETS.get(settings.CLIP_SUBTITLE_PRESET, SUBTITLE_PRESETS["bold_center"])
+                escaped_sub_path = _escape_filter_path(subtitle_path)
+                if animated_captions and settings.CLIP_ENABLE_ANIMATED_CAPTIONS:
+                    vf_parts.append(f"subtitles='{escaped_sub_path}'")
+                else:
+                    vf_parts.append(f"subtitles='{escaped_sub_path}':force_style='{preset}'")
+                if thought_callback:
+                    mode = "animated" if (animated_captions and settings.CLIP_ENABLE_ANIMATED_CAPTIONS) else "static"
+                    thought_callback(process_id, f"Caption Engine: Burn-in subtitles enabled for clip {clip_index} ({mode} / {settings.CLIP_SUBTITLE_PRESET}).")
+
+        elif can_drawtext:
+            # Fallback: Use drawtext filter to burn captions directly
+            caption_filters = _build_caption_drawtext_filters(
+                transcript_segments,
+                clip_start=start,
+                clip_end=start + duration,
+                max_words=max(3, settings.CLIP_SUBTITLE_MAX_WORDS)
+            )
+            if caption_filters:
+                vf_parts.extend(caption_filters)
+                if thought_callback:
+                    thought_callback(process_id, f"Caption Engine: Burn-in captions enabled using drawtext fallback for clip {clip_index} ({len(caption_filters)} caption segments).")
+
+        else:
+            # No burn-in available - will need external caption file
             if thought_callback:
-                mode = "animated" if (animated_captions and settings.CLIP_ENABLE_ANIMATED_CAPTIONS) else "static"
-                thought_callback(process_id, f"Caption Engine: Burn-in subtitles enabled for clip {clip_index} ({mode} / {settings.CLIP_SUBTITLE_PRESET}).")
+                thought_callback(process_id, f"Caption Engine: WARNING - Neither 'subtitles' nor 'drawtext' filters available. Captions will NOT be burned into video.")
 
     # Add CTA text overlay at end of clip if enabled and provided
     cta_to_use = cta_text.strip() if cta_text else ""
-    if settings.CAPTION_CTA_ENABLED and cta_to_use:
+    if enable_cta and settings.CAPTION_CTA_ENABLED and cta_to_use:
         cta_filter = _build_cta_text_overlay(duration, cta_to_use)
         if cta_filter:
             vf_parts.append(cta_filter)
@@ -646,7 +731,195 @@ def _write_clip_cues_json(cues_path: str, segments: List[Dict], clip_start: floa
         json.dump(payload, f, ensure_ascii=False)
     return True
 
-def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active_pids: dict = None, thought_callback=None, transcript: Optional[str] = None) -> List[str]:
+def _get_video_info(video_path: str) -> tuple:
+    """Get video duration and dimensions using ffprobe."""
+    try:
+        # Get duration
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", video_path],
+            capture_output=True, text=True, timeout=30
+        )
+        duration = float(result.stdout.strip()) if result.returncode == 0 else 0.0
+        
+        # Get width and height
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
+             "-of", "csv=s=x:p=0", video_path],
+            capture_output=True, text=True, timeout=30
+        )
+        width, height = 1080, 1920  # Default to vertical
+        if result.returncode == 0 and "x" in result.stdout.strip():
+            parts = result.stdout.strip().split("x")
+            if len(parts) == 2:
+                width, height = int(parts[0]), int(parts[1])
+        
+        return duration, width, height
+    except Exception as e:
+        print(f"Error getting video info: {e}")
+        return 0.0, 1080, 1920
+
+
+def _get_image_info(image_path: str) -> tuple:
+    """Get image dimensions using ffprobe."""
+    try:
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "stream=width,height",
+             "-of", "csv=s=x:p=0", image_path],
+            capture_output=True, text=True, timeout=30
+        )
+        if result.returncode == 0 and "x" in result.stdout.strip():
+            parts = result.stdout.strip().split("x")
+            if len(parts) == 2:
+                return int(parts[0]), int(parts[1])
+        return 1920, 1080  # Default fallback
+    except Exception as e:
+        print(f"Error getting image info: {e}")
+        return 1920, 1080
+
+
+def _append_endscreen_to_clip(clip_path: str, endscreen_path: str, cta_text: str, endscreen_duration: float = 3.0, process_id: str = None, clip_index: int = 0, thought_callback=None) -> bool:
+    """Append end screen image to clip with animated transition and CTA text overlay."""
+    try:
+        temp_output = clip_path + ".temp.mp4"
+        can_drawtext = _ffmpeg_supports_filter("drawtext")
+
+        # Get clip duration and dimensions
+        clip_duration, video_width, video_height = _get_video_info(clip_path)
+        if clip_duration <= 0:
+            print(f"Could not determine clip duration for {clip_path}")
+            return False
+
+        # Calculate fade start (0.5s before end, or at start if clip < 0.5s)
+        fade_start = max(0.0, clip_duration - 0.5)
+        # CTA appears 0.1s after end screen starts
+        cta_start = clip_duration + 0.1
+        # CTA shows until end of end screen
+        cta_end = clip_duration + endscreen_duration
+
+        # Escape CTA text for FFmpeg (escape single quotes and colons)
+        escaped_cta = cta_text.replace("'", "\\'").replace(":", "\\:") if cta_text else "Link in bio"
+
+        # Build FFmpeg command to concatenate clip with end screen image
+        # 1. Fade out the video clip in the last 0.5 seconds
+        # 2. Scale end screen to match video dimensions (center crop or fit)
+        # 3. Show the end screen image for endscreen_duration seconds
+        # 4. Add CTA text overlay on the end screen (if drawtext available)
+        
+        # Get actual image dimensions and calculate exact crop-to-fill dimensions
+        img_width, img_height = _get_image_info(endscreen_path)
+        img_aspect = img_width / img_height if img_height > 0 else 1.0
+        video_aspect = video_width / video_height if video_height > 0 else 0.56
+        
+        print(f"End screen: image={img_width}x{img_height} (aspect={img_aspect:.3f}), video={video_width}x{video_height} (aspect={video_aspect:.3f})")
+        
+        # Calculate exact target dimensions to cover the frame (crop-to-fill)
+        if img_aspect > video_aspect:
+            # Image is wider - scale to match video height, width will exceed
+            target_h = video_height
+            target_w = int(video_height * img_aspect)
+        else:
+            # Image is taller - scale to match video width, height will exceed
+            target_w = video_width
+            target_h = int(video_width / img_aspect)
+        
+        # Ensure target dimensions are at least as big as video
+        target_w = max(target_w, video_width)
+        target_h = max(target_h, video_height)
+        
+        # Ensure even dimensions (required by many codecs)
+        target_w = target_w + (target_w % 2)
+        target_h = target_h + (target_h % 2)
+        
+        # Center crop coordinates (ensure non-negative)
+        crop_x = max(0, (target_w - video_width) // 2)
+        crop_y = max(0, (target_h - video_height) // 2)
+        
+        # Validate crop fits within scaled image
+        if crop_x + video_width > target_w:
+            crop_x = max(0, target_w - video_width)
+        if crop_y + video_height > target_h:
+            crop_y = max(0, target_h - video_height)
+        
+        print(f"Filter params: scale={target_w}:{target_h}, crop={video_width}:{video_height}:{crop_x}:{crop_y}")
+        
+        # Build filter chain with exact values (no expressions)
+        scale_filter = (
+            f"scale={target_w}:{target_h}:flags=lanczos,"
+            f"crop={video_width}:{video_height}:{crop_x}:{crop_y},"
+            f"setsar=1,format=pix_fmts=yuv420p"
+        )
+        
+        if can_drawtext:
+            filter_complex = (
+                f"[0:v]fade=t=out:st={fade_start:.3f}:d=0.5,format=pix_fmts=yuv420p[clip]; "
+                f"[1:v]{scale_filter},trim=duration={endscreen_duration},fps=30[end]; "
+                f"[clip][end]concat=n=2:v=1:a=0[outv]; "
+                f"[outv]drawtext=text='{escaped_cta}':fontfile=/System/Library/Fonts/Helvetica.ttc:fontsize=36:fontcolor=white:borderw=4:bordercolor=black@0.8:x=(w-text_w)/2:y=h-text_h-80:enable='between(t\\,{cta_start:.3f}\\,{cta_end:.3f})'[final]"
+            )
+            video_map = "[final]"
+        else:
+            # Skip CTA overlay if drawtext not available
+            filter_complex = (
+                f"[0:v]fade=t=out:st={fade_start:.3f}:d=0.5,format=pix_fmts=yuv420p[clip]; "
+                f"[1:v]{scale_filter},trim=duration={endscreen_duration},fps=30[end]; "
+                f"[clip][end]concat=n=2:v=1:a=0[final]"
+            )
+            video_map = "[final]"
+
+        # Try hardware encoder first, fall back to software
+        encoder_attempts = [
+            # Hardware encoder
+            ["-c:v", "h264_videotoolbox", "-b:v", "5M", "-maxrate", "6M", "-bufsize", "10M"],
+            # Software encoder fallback
+            ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p"],
+        ]
+
+        for enc_idx, encoder_opts in enumerate(encoder_attempts):
+            cmd = [
+                "ffmpeg", "-y",
+                # Input 0: video clip
+                "-i", clip_path,
+                # Input 1: end screen image (looped)
+                "-loop", "1", "-i", endscreen_path,
+                # Complex filter
+                "-filter_complex", filter_complex,
+                # Map video from filter complex
+                "-map", video_map,
+                # Map audio from original clip only (no audio from image)
+                "-map", "0:a?",
+                # Copy audio codec
+                "-c:a", "aac", "-b:a", "128k",
+                # Video codec settings
+                *encoder_opts,
+                # Output
+                temp_output
+            ]
+
+            success, output = _run_ffmpeg_command(cmd, process_id=process_id)
+            if success:
+                os.replace(temp_output, clip_path)
+                if thought_callback:
+                    enc_name = "hardware" if enc_idx == 0 else "software"
+                    if can_drawtext:
+                        thought_callback(process_id, f"End Screen Studio: Clip {clip_index} finalized with end screen + CTA overlay ({enc_name} encoder).")
+                    else:
+                        thought_callback(process_id, f"End Screen Studio: Clip {clip_index} finalized with end screen ({enc_name} encoder, CTA skipped).")
+                return True
+            else:
+                if os.path.exists(temp_output):
+                    os.remove(temp_output)
+                if enc_idx == 0:
+                    print(f"Hardware encoder failed for end screen, trying software encoder...")
+                else:
+                    print(f"Error appending end screen: {output}")
+                    return False
+    except Exception as e:
+        print(f"Exception appending end screen: {e}")
+        return False
+
+
+def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active_pids: dict = None, thought_callback=None, transcript: Optional[str] = None, endscreen_path: Optional[str] = None, cta_text: str = "") -> List[str]:
     """Cuts a video into clips with PID tracking and live streaming."""
     output_clips = []
     raw_base_name = os.path.basename(video_path)
@@ -659,6 +932,10 @@ def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active
     padding = settings.CLIP_PADDING_SECONDS
     transcript_segments = _parse_transcript_segments(transcript)
     can_burn_subtitles = _ffmpeg_supports_filter("subtitles")
+    can_drawtext = _ffmpeg_supports_filter("drawtext")
+
+    # Get end screen duration from settings (default 3 seconds)
+    endscreen_duration = settings.CAPTION_CTA_END_IMAGE_DURATION if settings.CAPTION_CTA_END_IMAGE_DURATION else 3.0
 
     for i, hook in enumerate(hooks):
 
@@ -729,22 +1006,22 @@ def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active
                     thought_callback=thought_callback,
                     clip_index=i + 1,
                 )
-                if thought_callback and not can_burn_subtitles:
-                    thought_callback(process_id, f"Caption Engine: ffmpeg lacks 'subtitles' filter; using soft subtitle track fallback for clip {i+1}.")
-
             # Extract CTA text from hook caption (last line if it matches default CTA pattern)
-            cta_text = ""
+            hook_cta_text = ""
             if settings.CAPTION_CTA_ENABLED and settings.CAPTION_CTA_DEFAULT_TEXT:
                 hook_caption = hook.get("caption", "")
                 default_cta = settings.CAPTION_CTA_DEFAULT_TEXT.strip()
                 if default_cta in hook_caption:
-                    cta_text = default_cta
+                    hook_cta_text = default_cta
+
+            # Use provided CTA text from API if available, otherwise use hook CTA
+            final_cta_text = cta_text if cta_text else hook_cta_text
 
             attempts = [
-                {"enable_format": True, "enable_transitions": True, "enable_zoom": True, "enable_subtitles": can_burn_subtitles, "animated_captions": True},
-                {"enable_format": True, "enable_transitions": True, "enable_zoom": True, "enable_subtitles": can_burn_subtitles, "animated_captions": False},
-                {"enable_format": True, "enable_transitions": True, "enable_zoom": True, "enable_subtitles": False, "animated_captions": False},
-                {"enable_format": False, "enable_transitions": False, "enable_zoom": False, "enable_subtitles": False, "animated_captions": False},
+                {"enable_format": True, "enable_transitions": True, "enable_zoom": True, "enable_subtitles": can_burn_subtitles, "animated_captions": True, "enable_cta": can_drawtext},
+                {"enable_format": True, "enable_transitions": True, "enable_zoom": True, "enable_subtitles": can_burn_subtitles, "animated_captions": False, "enable_cta": can_drawtext},
+                {"enable_format": True, "enable_transitions": True, "enable_zoom": True, "enable_subtitles": False, "animated_captions": False, "enable_cta": can_drawtext},
+                {"enable_format": False, "enable_transitions": False, "enable_zoom": False, "enable_subtitles": False, "animated_captions": False, "enable_cta": False},
             ]
 
             success = False
@@ -768,12 +1045,24 @@ def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active
                     enable_zoom=attempt["enable_zoom"],
                     enable_subtitles=attempt["enable_subtitles"],
                     animated_captions=attempt["animated_captions"],
-                    cta_text=cta_text,
+                    cta_text=hook_cta_text,
+                    enable_cta=attempt["enable_cta"],
                 )
 
                 success, last_output = _run_ffmpeg_command(cmd, process_id=process_id, active_pids=active_pids)
                 if success:
                     output_clips.append(output_name)
+                    # Append end screen if provided
+                    if endscreen_path and os.path.exists(endscreen_path):
+                        _append_endscreen_to_clip(
+                            output_path,
+                            endscreen_path,
+                            final_cta_text,
+                            endscreen_duration,
+                            process_id,
+                            i + 1,
+                            thought_callback
+                        )
                     break
 
             if not success:

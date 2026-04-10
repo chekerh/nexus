@@ -39,6 +39,7 @@ let selectedFile = null;
 let endscreenFile = null;  // End screen image file
 let currentProcessId = null;
 let statusTimerInterval = null;
+let statusPollInterval = null;
 let statusStartMs = 0;
 
 function formatElapsed(seconds) {
@@ -265,17 +266,22 @@ processBtn.onclick = async () => {
 // Handle Stop Analysis
 stopBtn.onclick = async () => {
     if (!currentProcessId) return;
+    stopBtn.disabled = true;
+    stopBtn.innerText = "Stopping...";
     try {
         await fetch(`/cancel/${currentProcessId}`, { method: 'POST' });
         statusTitle.innerText = "Stopping Analysis...";
     } catch (err) {
         console.error("Stop failed", err);
+        stopBtn.disabled = false;
+        stopBtn.innerText = "Stop Analysis";
     }
 };
 
 // Poll for Results
 async function pollStatus(processId) {
-    const poll = setInterval(async () => {
+    if (statusPollInterval) clearInterval(statusPollInterval);
+    statusPollInterval = setInterval(async () => {
         try {
             const res = await fetch(`/status/${processId}`);
             const data = await res.json();
@@ -295,31 +301,44 @@ async function pollStatus(processId) {
             }
 
             if (data.status === 'completed') {
-                clearInterval(poll);
+                clearInterval(statusPollInterval);
+                statusPollInterval = null;
+                currentProcessId = null;
                 stopStatusTimer();
+                stopBtn.disabled = false;
+                stopBtn.innerText = 'Stop Analysis';
                 showResults(data, processId);
                 showClipReadyNotification(processId, (data.clips || []).length);
             } else if (data.status === 'error') {
-                clearInterval(poll);
+                clearInterval(statusPollInterval);
+                statusPollInterval = null;
+                currentProcessId = null;
                 stopStatusTimer();
                 statusTitle.innerText = "Process Failed";
                 thinkingConsole.innerHTML += `<div class="thinking-line error">CRITICAL ERROR: ${data.error}</div>`;
                 processBtn.disabled = false;
                 processDriveBtn.disabled = false;
                 processDriveBtn.innerText = 'Fetch from Drive & Analyze';
+                stopBtn.disabled = false;
+                stopBtn.innerText = 'Stop Analysis';
             } else if (data.status === 'cancelled') {
-                clearInterval(poll);
+                clearInterval(statusPollInterval);
+                statusPollInterval = null;
+                currentProcessId = null;
                 stopStatusTimer();
                 statusTitle.innerText = "Analysis Cancelled";
                 thinkingConsole.innerHTML += `<div class="thinking-line">Process terminated by user. Resources released.</div>`;
                 processBtn.disabled = false;
                 processDriveBtn.disabled = false;
                 processDriveBtn.innerText = 'Fetch from Drive & Analyze';
+                stopBtn.disabled = false;
+                stopBtn.innerText = 'Stop Analysis';
             }
 
             renderTimingSummary(data);
         } catch (err) {
-            clearInterval(poll);
+            clearInterval(statusPollInterval);
+            statusPollInterval = null;
             stopStatusTimer();
             console.error(err);
         }
@@ -652,7 +671,7 @@ function showResults(data, processId) {
                     </div>
                     <div class="clip-info">
                         <p>${hook.caption}</p>
-                        <a href="/video_clips/${encodedClip}" download class="btn btn-secondary">Download Clip</a>
+                        <a href="/video_clips/${encodedClip}" download class="btn btn-secondary">Download Video (with Captions)</a>
                         <input id="title-${index}" class="publish-input" value="${defaultTitle.replaceAll('"', '&quot;')}">
                         <textarea id="desc-${index}" class="publish-textarea">${defaultDesc}</textarea>
 

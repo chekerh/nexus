@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, BackgroundTasks, Form
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -219,8 +219,8 @@ async def get_audit_log(limit: int = 100):
 async def process_video(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    endscreen_image: Optional[UploadFile] = File(None),
-    cta_text: Optional[str] = Form("Link in bio to try it free.")
+    endscreen_image: UploadFile | None = File(None),
+    cta_text: str | None = Form("Link in bio to try it free.")
 ):
     """Uploads a video and triggers the AI pipeline."""
     # Validate file
@@ -550,7 +550,7 @@ def add_thought(process_id: str, thought: str):
         if len(processing_results[process_id]["thinking"]) > 150:
             processing_results[process_id]["thinking"].pop(0)
 
-def run_pipeline_sync(process_id: str, video_path: str):
+def run_pipeline_sync(process_id: str, video_path: str, endscreen_path: Optional[str] = None, cta_text: str = "Link in bio to try it free."):
     """Synchronous pipeline runner to allow thread-based background execution."""
     try:
         pipeline_t0 = time.perf_counter()
@@ -569,6 +569,8 @@ def run_pipeline_sync(process_id: str, video_path: str):
         check_cancelled()
         filename = processing_results[process_id]["filename"]
         add_thought(process_id, f"Scanning metadata... Video: '{filename}' detected.")
+        if endscreen_path:
+            add_thought(process_id, f"End Screen Studio: End screen image loaded with CTA: '{cta_text}'")
         add_thought(process_id, "Qwen Strategy: I'm going to look for high-energy peaks and semantic hooks that work for short-form retention.")
 
         # Step 1: Transcription
@@ -617,8 +619,19 @@ def run_pipeline_sync(process_id: str, video_path: str):
             add_thought(process_id, f"Qwen Strategic Insight: {analysis['strategy_thought']}")
             
         add_thought(process_id, f"Editor Monologue: Found {len(analysis.get('hooks', []))} viral segments. Initiating surgical cuts.")
+        if endscreen_path:
+            add_thought(process_id, f"End Screen Studio: Will append end screen image to each clip with CTA overlay.")
         t0 = time.perf_counter()
-        clips = cut_video(video_path, analysis["hooks"], process_id, active_pids, thought_callback=add_thought, transcript=transcript)
+        clips = cut_video(
+            video_path,
+            analysis["hooks"],
+            process_id,
+            active_pids,
+            thought_callback=add_thought,
+            transcript=transcript,
+            endscreen_path=endscreen_path,
+            cta_text=cta_text
+        )
         timing["cutting_seconds"] = round(time.perf_counter() - t0, 2)
         add_thought(process_id, f"Timing: Clip rendering finished in {timing['cutting_seconds']}s.")
         
