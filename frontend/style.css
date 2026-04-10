@@ -176,6 +176,78 @@ body {
     color: var(--text);
 }
 
+/* Input Tabs for File vs Drive */
+.input-tabs {
+    display: flex;
+    gap: .5rem;
+    margin-bottom: 1.2rem;
+    border-bottom: 1px solid var(--stroke);
+    padding-bottom: .5rem;
+}
+
+.tab-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: .6rem;
+    padding: .6rem 1.2rem;
+    color: var(--muted);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .2s ease;
+}
+
+.tab-btn:hover {
+    color: var(--text);
+    background: rgba(96, 214, 255, 0.08);
+}
+
+.tab-btn.active {
+    color: var(--text);
+    background: linear-gradient(145deg, rgba(96, 214, 255, 0.14), rgba(108, 124, 255, 0.12));
+    border-color: rgba(118, 174, 255, 0.26);
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Google Drive Input */
+.drive-input-wrapper {
+    margin-bottom: 1rem;
+}
+
+.drive-input {
+    width: 100%;
+    background: rgba(9, 15, 35, 0.55);
+    border: 1px solid rgba(126, 163, 255, 0.35);
+    border-radius: .75rem;
+    padding: 1rem 1.2rem;
+    color: var(--text);
+    font-size: 1rem;
+    transition: border-color .2s ease, box-shadow .2s ease;
+}
+
+.drive-input:focus {
+    outline: none;
+    border-color: rgba(97, 223, 255, 0.85);
+    box-shadow: 0 0 0 3px rgba(97, 223, 255, 0.15);
+}
+
+.drive-input::placeholder {
+    color: var(--muted);
+}
+
+.input-hint {
+    color: var(--muted);
+    font-size: .85rem;
+    margin-top: .5rem;
+    margin-bottom: 0;
+}
+
 .btn {
     border: none;
     border-radius: .75rem;
@@ -328,7 +400,7 @@ hr { border: 0; border-top: 1px solid rgba(112, 160, 255, .16); }
     max-width: 92%;
     text-align: center;
     pointer-events: none;
-    z-index: 6;
+    z-index: 1000;
 }
 
 .caption-overlay span {

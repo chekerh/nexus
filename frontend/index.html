@@ -72,11 +72,26 @@
 
             <!-- Upload Section -->
             <section class="upload-section card">
-                <div class="upload-dropzone" id="dropzone">
-                    <p>Drag and drop your video file or click to browse.</p>
-                    <input type="file" id="file-input" accept="video/*" hidden>
+                <div class="input-tabs">
+                    <button class="tab-btn active" id="tab-file" data-tab="file">Upload File</button>
+                    <button class="tab-btn" id="tab-drive" data-tab="drive">Google Drive</button>
                 </div>
-                <button class="btn btn-primary" id="process-btn" disabled>Start Analysis</button>
+                
+                <div class="tab-content active" id="content-file">
+                    <div class="upload-dropzone" id="dropzone">
+                        <p>Drag and drop your video file or click to browse.</p>
+                        <input type="file" id="file-input" accept="video/*" hidden>
+                    </div>
+                    <button class="btn btn-primary" id="process-btn" disabled>Start Analysis</button>
+                </div>
+                
+                <div class="tab-content" id="content-drive">
+                    <div class="drive-input-wrapper">
+                        <input type="text" id="drive-url" class="drive-input" placeholder="Paste Google Drive shareable link (e.g., https://drive.google.com/file/d/...)">
+                        <p class="input-hint">Make sure the file is shared with "Anyone with the link can view"</p>
+                    </div>
+                    <button class="btn btn-primary" id="process-drive-btn">Fetch from Drive & Analyze</button>
+                </div>
             </section>
 
             <!-- Status Section -->

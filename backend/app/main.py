@@ -16,6 +16,7 @@ from .core.video_editor import cut_video
 from .core.account_store import AccountStore
 from .core.publisher import publish_clip, PublishHistoryStore, SUPPORTED_PLATFORMS
 from .core.airllm_service import airllm_service
+from .core.drive_downloader import download_drive_file, extract_drive_file_id
 
 app = FastAPI(title="Nexus-UGC Dashboard")
 
@@ -70,6 +71,10 @@ class PublishRequest(BaseModel):
     description: str = ""
 
 
+class DriveProcessRequest(BaseModel):
+    drive_url: str
+
+
 def _sanitize_account(account: dict) -> dict:
     copy = dict(account)
     token = copy.get("oauth_refresh_token", "")
@@ -105,6 +110,33 @@ async def process_video(background_tasks: BackgroundTasks, file: UploadFile = Fi
     # We use a regular def for run_pipeline so it runs in a separate thread
     background_tasks.add_task(run_pipeline_sync, process_id, video_path)
     return {"process_id": process_id}
+
+@app.post("/process-drive")
+async def process_drive_video(background_tasks: BackgroundTasks, payload: DriveProcessRequest):
+    """Downloads a video from Google Drive and triggers the AI pipeline."""
+    drive_url = payload.drive_url.strip()
+    
+    # Validate URL
+    file_id = extract_drive_file_id(drive_url)
+    if not file_id:
+        return JSONResponse(
+            status_code=400, 
+            content={"error": "Invalid Google Drive URL. Please provide a shareable Drive link."}
+        )
+    
+    process_id = str(uuid.uuid4())
+    
+    processing_results[process_id] = {
+        "status": "Starting...", 
+        "thinking": ["System online. Preparing neural pathways..."],
+        "filename": f"drive_video_{file_id[:8]}.mp4",
+        "cancelled": False
+    }
+    
+    # Download and process in background
+    background_tasks.add_task(run_drive_pipeline_sync, process_id, drive_url)
+    return {"process_id": process_id}
+
 
 @app.post("/cancel/{process_id}")
 async def cancel_processing(process_id: str):
@@ -366,6 +398,42 @@ def run_pipeline_sync(process_id: str, video_path: str):
         active_pids.pop(process_id, None)
         if os.path.exists(video_path):
             os.remove(video_path)
+
+
+def run_drive_pipeline_sync(process_id: str, drive_url: str):
+    """Downloads from Google Drive then runs the standard pipeline."""
+    video_path = None
+    try:
+        add_thought(process_id, f"Drive: Connecting to Google Drive...")
+        
+        # Download the video
+        video_path = download_drive_file(
+            drive_url, 
+            settings.UPLOAD_DIR, 
+            progress_callback=lambda msg: add_thought(process_id, msg)
+        )
+        
+        if not video_path:
+            processing_results[process_id].update({
+                "status": "error", 
+                "error": "Failed to download from Google Drive. Check that the file is shared and accessible."
+            })
+            return
+        
+        # Update filename in results
+        processing_results[process_id]["filename"] = os.path.basename(video_path)
+        
+        # Run the standard pipeline
+        add_thought(process_id, "Drive: Download complete. Starting AI pipeline...")
+        run_pipeline_sync(process_id, video_path)
+        
+    except Exception as e:
+        status = "cancelled" if "cancelled" in str(e).lower() else "error"
+        processing_results[process_id].update({"status": status, "error": str(e)})
+        # Clean up downloaded file if it exists
+        if video_path and os.path.exists(video_path):
+            os.remove(video_path)
+
 
 # Serve the frontend
 app.mount("/", StaticFiles(directory=settings.FRONTEND_DIR, html=True), name="static")

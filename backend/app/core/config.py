@@ -65,6 +65,13 @@ class Settings(BaseSettings):
     CLIP_MAX_SECONDS: float = 45.0
     CLIP_PADDING_SECONDS: float = 1.5
 
+    # Caption CTA (Call-to-Action) Settings
+    CAPTION_CTA_ENABLED: bool = True
+    CAPTION_CTA_DEFAULT_TEXT: str = "Link in bio to try it free."
+    CAPTION_CTA_END_IMAGE_PATH: str = ""  # Path to end-of-video image (optional)
+    CAPTION_CTA_END_IMAGE_DURATION: float = 3.0  # Seconds to show end image
+    CAPTION_CTA_END_IMAGE_CAPTION: str = ""  # Caption text burned on end image
+
     class Config:
         env_file = str(BASE_DIR / ".env")
 

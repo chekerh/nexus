@@ -32,6 +32,14 @@ const accountTikTokAccessToken = document.getElementById('account-tiktok-access-
 const accountsList = document.getElementById('accounts-list');
 const publishConsole = document.getElementById('publish-console');
 
+// Google Drive elements
+const tabFile = document.getElementById('tab-file');
+const tabDrive = document.getElementById('tab-drive');
+const contentFile = document.getElementById('content-file');
+const contentDrive = document.getElementById('content-drive');
+const driveUrlInput = document.getElementById('drive-url');
+const processDriveBtn = document.getElementById('process-drive-btn');
+
 let selectedFile = null;
 let currentProcessId = null;
 let accountsCache = [];
@@ -135,6 +143,65 @@ fileInput.onchange = (e) => {
     }
 };
 
+// Tab Switching
+function switchTab(tab) {
+    if (tab === 'file') {
+        tabFile.classList.add('active');
+        tabDrive.classList.remove('active');
+        contentFile.classList.add('active');
+        contentDrive.classList.remove('active');
+    } else {
+        tabFile.classList.remove('active');
+        tabDrive.classList.add('active');
+        contentFile.classList.remove('active');
+        contentDrive.classList.add('active');
+    }
+}
+
+tabFile?.addEventListener('click', () => switchTab('file'));
+tabDrive?.addEventListener('click', () => switchTab('drive'));
+
+// Google Drive Processing
+processDriveBtn?.addEventListener('click', async () => {
+    const driveUrl = driveUrlInput?.value?.trim();
+    if (!driveUrl) {
+        showToast('Error', 'Please paste a Google Drive URL');
+        return;
+    }
+
+    // Reset UI
+    processDriveBtn.disabled = true;
+    processDriveBtn.innerText = 'Downloading...';
+    statusSection.classList.remove('hidden');
+    resultsSection.classList.add('hidden');
+    thinkingConsole.innerHTML = '<div class="thinking-line">Connecting to Google Drive...</div>';
+    statusTitle.innerText = "AI Processing...";
+    timingSummary.innerText = 'Awaiting stage metrics...';
+    startStatusTimer();
+
+    try {
+        const response = await fetch('/process-drive', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ drive_url: driveUrl })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to process Drive video');
+        }
+
+        const { process_id } = await response.json();
+        currentProcessId = process_id;
+        pollStatus(process_id);
+    } catch (err) {
+        console.error(err);
+        thinkingConsole.innerHTML += `<div class="thinking-line error">Error: ${err.message}</div>`;
+        processDriveBtn.disabled = false;
+        processDriveBtn.innerText = 'Fetch from Drive & Analyze';
+    }
+});
+
 // Handle Processing
 processBtn.onclick = async () => {
     if (!selectedFile) return;
@@ -210,12 +277,16 @@ async function pollStatus(processId) {
                 statusTitle.innerText = "Process Failed";
                 thinkingConsole.innerHTML += `<div class="thinking-line error">CRITICAL ERROR: ${data.error}</div>`;
                 processBtn.disabled = false;
+                processDriveBtn.disabled = false;
+                processDriveBtn.innerText = 'Fetch from Drive & Analyze';
             } else if (data.status === 'cancelled') {
                 clearInterval(poll);
                 stopStatusTimer();
                 statusTitle.innerText = "Analysis Cancelled";
                 thinkingConsole.innerHTML += `<div class="thinking-line">Process terminated by user. Resources released.</div>`;
                 processBtn.disabled = false;
+                processDriveBtn.disabled = false;
+                processDriveBtn.innerText = 'Fetch from Drive & Analyze';
             }
 
             renderTimingSummary(data);
@@ -424,7 +495,7 @@ async function bindStyledCaptionOverlays(clips) {
         } catch (_) {}
 
         if (video.textTracks && video.textTracks[0]) {
-            video.textTracks[0].mode = 'showing';
+            video.textTracks[0].mode = 'hidden';
         }
 
         if (!cuesPayload || !Array.isArray(cuesPayload.cues)) {
@@ -534,6 +605,8 @@ function showResults(data, processId) {
     }
 
     processBtn.disabled = false;
+    processDriveBtn.disabled = false;
+    processDriveBtn.innerText = 'Fetch from Drive & Analyze';
     if (data?.timing?.total_seconds) {
         showToast('Pipeline complete', `Process ${String(processId || '').slice(-6).toUpperCase()} finished in ${data.timing.total_seconds}s`);
     }
