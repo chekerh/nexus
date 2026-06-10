@@ -1,0 +1,16 @@
+.venv
+venv
+.git
+.gitignore
+__pycache__
+*.pyc
+.env
+*.mp4
+*.mov
+*.wav
+*.mkv
+backend/data/*.db
+backend/data/accounts.json
+backend/data/account_groups.json
+backend/data/publish_history.json
+node_modules

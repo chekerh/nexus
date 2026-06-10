@@ -15,6 +15,11 @@ const accountsList = document.getElementById('accounts-list');
 const unloadBackendBtn = document.getElementById('unload-backend-btn');
 const toastContainer = document.getElementById('toast-container');
 
+// Auth UI elements
+const loginBtn = document.getElementById('login-btn');
+const logoutBtn = document.getElementById('logout-btn');
+const userEmail = document.getElementById('user-email');
+
 // State
 let groupsCache = [];
 let accountsCache = [];
@@ -60,8 +65,7 @@ async function refreshBackendRuntimeStatus() {
 // Load data
 async function loadGroups() {
     try {
-        const res = await fetch('/account-groups');
-        const data = await res.json();
+        const data = await apiJSON('/account-groups');
         groupsCache = data.groups || [];
         renderGroups();
         updateStats();
@@ -73,8 +77,7 @@ async function loadGroups() {
 
 async function loadAccounts() {
     try {
-        const res = await fetch('/accounts');
-        const data = await res.json();
+        const data = await apiJSON('/accounts');
         accountsCache = data.accounts || [];
         renderAccounts();
         updateStats();
@@ -194,13 +197,10 @@ async function createGroup() {
     }
 
     try {
-        const res = await fetch('/account-groups', {
+        await apiJSON('/account-groups', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, description, account_ids: [] })
+            body: { name, description, account_ids: [] }
         });
-
-        if (!res.ok) throw new Error('Failed to create group');
 
         groupName.value = '';
         groupDescription.value = '';
@@ -216,8 +216,7 @@ async function deleteGroup(groupId) {
     if (!confirm('Delete this group? Accounts will not be deleted.')) return;
 
     try {
-        const res = await fetch(`/account-groups/${groupId}`, { method: 'DELETE' });
-        if (!res.ok) throw new Error('Failed to delete');
+        await api(`/account-groups/${groupId}`, { method: 'DELETE' });
         await loadGroups();
         showToast('Success', 'Group deleted');
     } catch (err) {
@@ -236,8 +235,7 @@ async function addAccountToGroup(groupId) {
     }
 
     try {
-        const res = await fetch(`/account-groups/${groupId}/accounts/${accountId}`, { method: 'POST' });
-        if (!res.ok) throw new Error('Failed to add');
+        await api(`/account-groups/${groupId}/accounts/${accountId}`, { method: 'POST' });
         await loadGroups();
         showToast('Success', 'Account added to group');
     } catch (err) {
@@ -248,8 +246,7 @@ async function addAccountToGroup(groupId) {
 
 async function removeAccountFromGroup(groupId, accountId) {
     try {
-        const res = await fetch(`/account-groups/${groupId}/accounts/${accountId}`, { method: 'DELETE' });
-        if (!res.ok) throw new Error('Failed to remove');
+        await api(`/account-groups/${groupId}/accounts/${accountId}`, { method: 'DELETE' });
         await loadGroups();
         showToast('Success', 'Account removed from group');
     } catch (err) {
@@ -278,8 +275,8 @@ async function createAccount() {
     if (platform === 'youtube') {
         const refreshToken = document.getElementById('account-refresh-token')?.value?.trim();
         const privacy = document.getElementById('account-youtube-privacy')?.value;
-        if (refreshToken) payload.refresh_token = refreshToken;
-        if (privacy) payload.youtube_privacy = privacy;
+        if (refreshToken) payload.oauth_refresh_token = refreshToken;
+        if (privacy) payload.youtube_privacy_status = privacy;
     } else if (platform === 'instagram') {
         const userId = document.getElementById('account-instagram-user-id')?.value?.trim();
         const token = document.getElementById('account-instagram-token')?.value?.trim();
@@ -295,13 +292,10 @@ async function createAccount() {
     }
 
     try {
-        const res = await fetch('/accounts', {
+        await apiJSON('/accounts', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            body: payload
         });
-
-        if (!res.ok) throw new Error('Failed to add account');
 
         // Clear form
         accountName.value = '';
@@ -320,8 +314,7 @@ async function deleteAccount(accountId) {
     if (!confirm('Delete this account? It will be removed from all groups.')) return;
 
     try {
-        const res = await fetch(`/accounts/${accountId}`, { method: 'DELETE' });
-        if (!res.ok) throw new Error('Failed to delete');
+        await api(`/accounts/${accountId}`, { method: 'DELETE' });
         await Promise.all([loadAccounts(), loadGroups()]);
         showToast('Success', 'Account deleted');
     } catch (err) {
@@ -356,7 +349,24 @@ unloadBackendBtn?.addEventListener('click', async () => {
     }
 });
 
+// Auth UI
+function updateAuthUI() {
+  if (isAuthenticated()) {
+    loginBtn?.classList.add('hidden');
+    logoutBtn?.classList.remove('hidden');
+    getMe().then(u => { if (userEmail) userEmail.textContent = u.email; }).catch(() => {});
+  } else {
+    loginBtn?.classList.remove('hidden');
+    logoutBtn?.classList.add('hidden');
+    if (userEmail) userEmail.textContent = 'Not signed in';
+  }
+}
+
+loginBtn?.addEventListener('click', () => window.location.href = '/login.html');
+logoutBtn?.addEventListener('click', () => { clearToken(); updateAuthUI(); showToast('Signed out'); });
+
 // Initialize
+updateAuthUI();
 loadGroups();
 loadAccounts();
 updateCredentialFields();

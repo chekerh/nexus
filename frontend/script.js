@@ -17,6 +17,11 @@ const thinkingConsole = document.getElementById('thinking-console');
 const statusTitle = document.getElementById('status-title');
 const publishConsole = document.getElementById('publish-console');
 
+// Auth UI elements
+const loginBtn = document.getElementById('login-btn');
+const logoutBtn = document.getElementById('logout-btn');
+const userEmail = document.getElementById('user-email');
+
 // Google Drive elements
 const tabFile = document.getElementById('tab-file');
 const tabDrive = document.getElementById('tab-drive');
@@ -197,20 +202,13 @@ processDriveBtn?.addEventListener('click', async () => {
     startStatusTimer();
 
     try {
-        const response = await fetch('/process-drive', {
+        const data = await apiJSON('/process-drive', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ drive_url: driveUrl })
+            body: { drive_url: driveUrl }
         });
 
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to process Drive video');
-        }
-
-        const { process_id } = await response.json();
-        currentProcessId = process_id;
-        pollStatus(process_id);
+        currentProcessId = data.process_id;
+        pollStatus(data.process_id);
     } catch (err) {
         console.error(err);
         thinkingConsole.innerHTML += `<div class="thinking-line error">Error: ${err.message}</div>`;
@@ -248,14 +246,13 @@ processBtn.onclick = async () => {
     startStatusTimer();
 
     try {
-        const response = await fetch('/process', {
+        const response = await api('/process', {
             method: 'POST',
             body: formData
         });
-
-        const { process_id } = await response.json();
-        currentProcessId = process_id;
-        pollStatus(process_id);
+        const data = await response.json();
+        currentProcessId = data.process_id;
+        pollStatus(data.process_id);
     } catch (err) {
         console.error(err);
         thinkingConsole.innerHTML += `<div class="thinking-line error">Error uploading file: ${err}</div>`;
@@ -269,7 +266,7 @@ stopBtn.onclick = async () => {
     stopBtn.disabled = true;
     stopBtn.innerText = "Stopping...";
     try {
-        await fetch(`/cancel/${currentProcessId}`, { method: 'POST' });
+        await api(`/cancel/${currentProcessId}`, { method: 'POST' });
         statusTitle.innerText = "Stopping Analysis...";
     } catch (err) {
         console.error("Stop failed", err);
@@ -283,7 +280,7 @@ async function pollStatus(processId) {
     if (statusPollInterval) clearInterval(statusPollInterval);
     statusPollInterval = setInterval(async () => {
         try {
-            const res = await fetch(`/status/${processId}`);
+            const res = await api(`/status/${processId}`);
             const data = await res.json();
 
             // Update Thinking Console with new thoughts
@@ -353,8 +350,7 @@ let groupsCache = [];
 
 async function loadAccounts() {
     try {
-        const res = await fetch('/accounts');
-        const data = await res.json();
+        const data = await apiJSON('/accounts');
         accountsCache = data.accounts || [];
     } catch (err) {
         console.error('Failed to load accounts', err);
@@ -363,8 +359,7 @@ async function loadAccounts() {
 
 async function loadGroups() {
     try {
-        const res = await fetch('/account-groups');
-        const data = await res.json();
+        const data = await apiJSON('/account-groups');
         groupsCache = data.groups || [];
     } catch (err) {
         console.error('Failed to load groups', err);
@@ -406,17 +401,10 @@ async function publishClip(index) {
     }
 
     try {
-        const res = await fetch('/publish', {
+        const data = await apiJSON('/publish', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            body: payload
         });
-        const data = await res.json();
-
-        if (!res.ok) {
-            publishConsole.innerHTML = `<div class="publish-line error">Publish failed: ${data.error || 'Unknown error'}</div>`;
-            return;
-        }
 
         const result = data.publish.result;
         publishConsole.innerHTML = `
@@ -458,30 +446,24 @@ async function publishClipToGroup(index) {
     const results = [];
     for (const account of group.accounts) {
         try {
-            const res = await fetch('/publish', {
+            const data = await apiJSON('/publish', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+                body: {
                     platform: account.platform,
                     account_id: account.id,
                     clip_filename: clip,
                     title: title,
                     description: description
-                })
+                }
             });
 
-            const data = await res.json();
-            results.push({ account: account.account_name, platform: account.platform, success: res.ok, data });
+            results.push({ account: account.account_name, platform: account.platform, success: true, data });
 
-            if (!res.ok) {
-                publishConsole.innerHTML += `<div class="publish-line error">Failed for ${account.account_name}: ${data.error || 'Unknown error'}</div>`;
+            const result = data.publish.result;
+            if (result.upload_url) {
+                publishConsole.innerHTML += `<div class="publish-line">${account.account_name} (${account.platform}): <a href="${result.upload_url}" target="_blank">Open upload</a></div>`;
             } else {
-                const result = data.publish.result;
-                if (result.upload_url) {
-                    publishConsole.innerHTML += `<div class="publish-line">${account.account_name} (${account.platform}): <a href="${result.upload_url}" target="_blank">Open upload</a></div>`;
-                } else {
-                    publishConsole.innerHTML += `<div class="publish-line">${account.account_name} (${account.platform}): Published successfully</div>`;
-                }
+                publishConsole.innerHTML += `<div class="publish-line">${account.account_name} (${account.platform}): Published successfully</div>`;
             }
         } catch (err) {
             results.push({ account: account.account_name, platform: account.platform, success: false, error: err.message });
@@ -737,7 +719,24 @@ if (unloadBackendBtn) {
     };
 }
 
+// Auth UI
+function updateAuthUI() {
+  if (isAuthenticated()) {
+    loginBtn?.classList.add('hidden');
+    logoutBtn?.classList.remove('hidden');
+    getMe().then(u => { if (userEmail) userEmail.textContent = u.email; }).catch(() => {});
+  } else {
+    loginBtn?.classList.remove('hidden');
+    logoutBtn?.classList.add('hidden');
+    if (userEmail) userEmail.textContent = 'Not signed in';
+  }
+}
+
+loginBtn?.addEventListener('click', () => window.location.href = '/login.html');
+logoutBtn?.addEventListener('click', () => { clearToken(); updateAuthUI(); showToast('Signed out'); });
+
 // Initialize
+updateAuthUI();
 loadAccounts();
 loadGroups();
 refreshBackendRuntimeStatus();

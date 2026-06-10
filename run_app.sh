@@ -152,7 +152,9 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 # 6) Start app
-echo "Starting Nexus-UGC on http://127.0.0.1:8000"
+echo "Starting Nexus-UGC v2 on http://127.0.0.1:8000"
+echo "  Database: SQLite (set DATABASE_URL for PostgreSQL)"
+echo "  API:       http://127.0.0.1:8000/api/v1/docs"
 if dev_reload_enabled "$DEV_RELOAD"; then
   exec uvicorn backend.app.main:app --reload --port 8000
 else

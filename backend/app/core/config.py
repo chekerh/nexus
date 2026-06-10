@@ -73,6 +73,14 @@ class Settings(BaseSettings):
     CAPTION_CTA_END_IMAGE_DURATION: float = 3.0  # Seconds to show end image
     CAPTION_CTA_END_IMAGE_CAPTION: str = ""  # Caption text burned on end image
 
+    # Billing / Multi-tenant settings
+    JWT_SECRET: str = "nexus-dev-secret-change-in-production"
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+    STRIPE_PRO_PRICE_ID: str = ""
+    STRIPE_ENTERPRISE_PRICE_ID: str = ""
+    DATABASE_URL: str = ""  # Empty = SQLite; set to postgresql://... for production
+
     class Config:
         env_file = str(BASE_DIR / ".env")
 
