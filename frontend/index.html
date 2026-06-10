@@ -74,6 +74,40 @@
                         <p class="dropzone-hint">Supports MP4, MOV, AVI, MKV, WebM</p>
                         <input type="file" id="file-input" accept="video/*" hidden>
                     </div>
+                    <div class="inline-controls">
+                        <div class="language-selector">
+                            <label for="lang-select">Caption Language</label>
+                            <select id="lang-select" class="lang-select">
+                                <option value="en">English (original)</option>
+                                <option value="es">Español</option>
+                                <option value="fr">Français</option>
+                                <option value="de">Deutsch</option>
+                                <option value="it">Italiano</option>
+                                <option value="pt">Português</option>
+                                <option value="ru">Русский</option>
+                                <option value="ja">日本語</option>
+                                <option value="ko">한국어</option>
+                                <option value="zh">中文</option>
+                                <option value="ar">العربية</option>
+                                <option value="hi">हिन्दी</option>
+                                <option value="nl">Nederlands</option>
+                                <option value="tr">Türkçe</option>
+                                <option value="vi">Tiếng Việt</option>
+                                <option value="th">ไทย</option>
+                            </select>
+                        </div>
+                        <div class="language-selector">
+                            <label for="ar-select">Aspect Ratio</label>
+                            <select id="ar-select" class="lang-select">
+                                <option value="vertical_9_16">Vertical 9:16 (TikTok/Reels)</option>
+                                <option value="square_1_1">Square 1:1 (Instagram)</option>
+                                <option value="portrait_4_5">Portrait 4:5 (Facebook)</option>
+                                <option value="landscape_16_9">Landscape 16:9 (YouTube)</option>
+                                <option value="source">Original (no reframe)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <p class="input-hint" style="margin-top:-0.5rem;margin-bottom:0.75rem;">Translation uses local AI (Ollama)</p>
                     <button class="btn btn-primary" id="process-btn" disabled>Start Analysis</button>
                 </div>
                 
@@ -85,6 +119,39 @@
                     <div class="drive-input-wrapper">
                         <input type="text" id="drive-url" class="drive-input" placeholder="Paste Google Drive shareable link (e.g., https://drive.google.com/file/d/...)">
                         <p class="input-hint">Make sure the file is shared with "Anyone with the link can view"</p>
+                    </div>
+                    <div class="inline-controls">
+                        <div class="language-selector">
+                            <label for="drive-lang-select">Caption Language</label>
+                            <select id="drive-lang-select" class="lang-select">
+                                <option value="en">English (original)</option>
+                                <option value="es">Español</option>
+                                <option value="fr">Français</option>
+                                <option value="de">Deutsch</option>
+                                <option value="it">Italiano</option>
+                                <option value="pt">Português</option>
+                                <option value="ru">Русский</option>
+                                <option value="ja">日本語</option>
+                                <option value="ko">한국어</option>
+                                <option value="zh">中文</option>
+                                <option value="ar">العربية</option>
+                                <option value="hi">हिन्दी</option>
+                                <option value="nl">Nederlands</option>
+                                <option value="tr">Türkçe</option>
+                                <option value="vi">Tiếng Việt</option>
+                                <option value="th">ไทย</option>
+                            </select>
+                        </div>
+                        <div class="language-selector">
+                            <label for="drive-ar-select">Aspect Ratio</label>
+                            <select id="drive-ar-select" class="lang-select">
+                                <option value="vertical_9_16">Vertical 9:16 (TikTok/Reels)</option>
+                                <option value="square_1_1">Square 1:1 (Instagram)</option>
+                                <option value="portrait_4_5">Portrait 4:5 (Facebook)</option>
+                                <option value="landscape_16_9">Landscape 16:9 (YouTube)</option>
+                                <option value="source">Original (no reframe)</option>
+                            </select>
+                        </div>
                     </div>
                     <button class="btn btn-primary" id="process-drive-btn">Fetch from Drive & Analyze</button>
                 </div>

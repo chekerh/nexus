@@ -202,9 +202,15 @@ processDriveBtn?.addEventListener('click', async () => {
     startStatusTimer();
 
     try {
+        const driveLangSelect = document.getElementById('drive-lang-select');
+        const driveArSelect = document.getElementById('drive-ar-select');
         const data = await apiJSON('/process-drive', {
             method: 'POST',
-            body: { drive_url: driveUrl }
+            body: {
+                drive_url: driveUrl,
+                language: driveLangSelect?.value || 'en',
+                aspect_ratio: driveArSelect?.value || 'vertical_9_16'
+            }
         });
 
         currentProcessId = data.process_id;
@@ -232,6 +238,14 @@ processBtn.onclick = async () => {
     // Add CTA text
     const ctaText = ctaTextInput?.value?.trim() || 'Link in bio to try it free.';
     formData.append('cta_text', ctaText);
+
+    // Add language
+    const langSelect = document.getElementById('lang-select');
+    formData.append('language', langSelect?.value || 'en');
+
+    // Add aspect ratio
+    const arSelect = document.getElementById('ar-select');
+    formData.append('aspect_ratio', arSelect?.value || 'vertical_9_16');
 
     // Reset UI
     processBtn.disabled = true;
@@ -613,19 +627,25 @@ function showResults(data, processId) {
     statusSection.classList.add('hidden');
     resultsSection.classList.remove('hidden');
     
+    const langLabel = data.language && data.language !== 'en' ? ` (translated to ${data.language})` : '';
     transcriptContent.innerText = data.transcript;
     
     // Clear previous results
     clipsContainer.innerHTML = '';
 
-    // Format JSON Analysis
+    // Format JSON Analysis with virality scores
     if (data.analysis && data.analysis.hooks) {
-        analysisContent.innerHTML = data.analysis.hooks.map(hook => `
-            <div class="hook-item">
-                <strong>${hook.hook_name}</strong> (${hook.start}s - ${hook.end}s)<br>
-                <em>${hook.caption}</em>
-            </div>
-        `).join('<hr>');
+        analysisContent.innerHTML = data.analysis.hooks.map(hook => {
+            const vs = hook.virality_score;
+            const scoreBadge = vs ? `<span class="virality-badge" style="float:right;background:${vs >= 70 ? '#4ade80' : vs >= 50 ? '#fbbf24' : '#f87171'};color:#000;padding:2px 8px;border-radius:12px;font-weight:600;">${vs}/100</span>` : '';
+            return `
+                <div class="hook-item">
+                    ${scoreBadge}
+                    <strong>${hook.hook_name}</strong> (${hook.start}s - ${hook.end}s)${langLabel}<br>
+                    <em>${hook.caption}</em>
+                </div>
+            `;
+        }).join('<hr>');
     }
 
     // Render Video Clips
@@ -642,12 +662,16 @@ function showResults(data, processId) {
                 ? groupsCache.map(g => `<option value="${g.id}">${g.name} (${g.accounts?.length || 0} accounts)</option>`).join('')
                 : '<option value="">No groups - create one first</option>';
 
+            const vs = hook.virality_score;
+            const scoreBadge = vs ? `<span class="virality-badge" style="display:inline-block;background:${vs >= 70 ? '#4ade80' : vs >= 50 ? '#fbbf24' : '#f87171'};color:#000;padding:1px 8px;border-radius:10px;font-size:0.8rem;font-weight:600;margin-left:8px;">${vs}/100</span>` : '';
+            const langBadge = data.language && data.language !== 'en' ? `<span class="lang-badge" style="display:inline-block;background:rgba(93,215,255,0.2);border:1px solid rgba(93,215,255,0.3);color:#5dd7ff;padding:1px 8px;border-radius:10px;font-size:0.75rem;margin-left:6px;">${data.language}</span>` : '';
+            const arBadge = data.aspect_ratio && data.aspect_ratio !== 'source' ? `<span class="lang-badge" style="display:inline-block;background:rgba(180,130,255,0.15);border:1px solid rgba(180,130,255,0.3);color:#b482ff;padding:1px 8px;border-radius:10px;font-size:0.75rem;margin-left:6px;">${data.aspect_ratio.replace('_', ' ')}</span>` : '';
             return `
                 <div class="card clip-card" id="clip-${index}" data-filename="${clip}">
-                    <h4>${hook.hook_name}</h4>
+                    <h4>${hook.hook_name}${scoreBadge}${langBadge}${arBadge}</h4>
                     <div class="video-shell">
                     <video id="video-${index}" controls width="100%" src="/video_clips/${encodedClip}">
-                        <track kind="subtitles" srclang="en" label="English" src="/video_clips/${vtt}" default>
+                        <track kind="subtitles" srclang="${data.language || 'en'}" label="${data.language || 'English'}" src="/video_clips/${vtt}" default>
                     </video>
                     <div id="caption-overlay-${index}" class="caption-overlay"></div>
                     </div>

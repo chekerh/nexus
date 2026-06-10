@@ -807,6 +807,55 @@ hr { border: 0; border-top: 1px solid rgba(112, 160, 255, .16); }
     color: #4cf3b1;
 }
 
+.inline-controls {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+}
+
+.inline-controls .language-selector {
+    margin-top: 0;
+    flex: 1;
+    min-width: 180px;
+}
+
+.language-selector {
+    margin-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.language-selector label {
+    font-size: 0.85rem;
+    color: var(--muted);
+    font-weight: 500;
+}
+
+.lang-select {
+    background: rgba(20, 31, 66, 0.6);
+    border: 1px solid rgba(112, 160, 255, 0.2);
+    border-radius: 0.75rem;
+    padding: 0.65rem 1rem;
+    color: var(--text);
+    font-size: 0.9rem;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+    max-width: 280px;
+}
+
+.lang-select:hover,
+.lang-select:focus {
+    border-color: rgba(118, 174, 255, 0.5);
+}
+
+.lang-select option {
+    background: #0e1430;
+    color: var(--text);
+}
+
 .accounts-list { display: grid; gap: .55rem; }
 
 .account-row {

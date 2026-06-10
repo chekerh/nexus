@@ -60,7 +60,8 @@ class JobQueue:
 
     def enqueue(self, db: Session, user_id: str, filename: str = "", video_path: str = "",
                 endscreen_path: str = "", cta_text: str = "Link in bio to try it free.",
-                source: str = "upload", drive_url: str = "") -> str:
+                source: str = "upload", drive_url: str = "", target_language: str = "en",
+                aspect_ratio: str = "vertical_9_16") -> str:
         job = Job(
             user_id=user_id,
             filename=filename,
@@ -69,6 +70,8 @@ class JobQueue:
             cta_text=cta_text,
             source=source,
             drive_url=drive_url,
+            target_language=target_language,
+            aspect_ratio=aspect_ratio,
             status="pending",
             thinking_json="[]",
         )

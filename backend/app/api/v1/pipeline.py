@@ -15,6 +15,7 @@ from ...models.user import User, SubscriptionTier
 from ...models.job import Job
 from ...services.job_queue import job_queue
 from ...services.usage import check_usage_quota, increment_usage, get_tier_limits
+from ...core.translator import is_supported_language
 from ..deps import get_current_user, get_optional_user
 
 router = APIRouter(tags=["pipeline"])
@@ -47,8 +48,12 @@ ALLOWED_MIME_TYPES = {
 MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024
 
 
+VALID_ASPECT_RATIOS = {"source", "vertical_9_16", "square_1_1", "portrait_4_5", "landscape_16_9"}
+
 class DriveProcessRequest(BaseModel):
     drive_url: str
+    language: str = "en"
+    aspect_ratio: str = "vertical_9_16"
 
 
 def _validate_video_file(filename: str, content_type: str) -> tuple[bool, str]:
@@ -65,6 +70,8 @@ async def process_video(
     file: UploadFile = File(...),
     endscreen_image: UploadFile = None,
     cta_text: str = Form("Link in bio to try it free."),
+    language: str = Form("en"),
+    aspect_ratio: str = Form("vertical_9_16"),
     user: User = Depends(get_optional_user),
     db: Session = Depends(get_db),
 ):
@@ -96,12 +103,16 @@ async def process_video(
         with open(endscreen_path, "wb") as buf:
             shutil.copyfileobj(endscreen_image.file, buf)
 
+    target_lang = language if is_supported_language(language) else "en"
+    ar = aspect_ratio if aspect_ratio in VALID_ASPECT_RATIOS else "vertical_9_16"
     job_id = job_queue.enqueue(
         db, user.id,
         filename=file.filename,
         video_path=video_path,
         endscreen_path=endscreen_path,
         cta_text=cta_text or "Link in bio to try it free.",
+        target_language=target_lang,
+        aspect_ratio=ar,
     )
 
     increment_usage(db, user)
@@ -124,11 +135,15 @@ async def process_drive_video(
     if not file_id:
         raise HTTPException(status_code=400, detail="Invalid Google Drive URL")
 
+    target_lang = payload.language if is_supported_language(payload.language) else "en"
+    ar = payload.aspect_ratio if payload.aspect_ratio in VALID_ASPECT_RATIOS else "vertical_9_16"
     job_id = job_queue.enqueue(
         db, user.id,
         filename=f"drive_{file_id[:8]}.mp4",
         source="drive",
         drive_url=payload.drive_url,
+        target_language=target_lang,
+        aspect_ratio=ar,
     )
 
     increment_usage(db, user)
@@ -158,6 +173,8 @@ def get_status(process_id: str, user: User = Depends(get_optional_user), db: Ses
     result = {
         "status": job.status,
         "filename": job.filename,
+        "language": job.target_language or "en",
+        "aspect_ratio": job.aspect_ratio or "vertical_9_16",
         "thinking": json.loads(job.thinking_json or "[]"),
         "error": job.error or None,
     }
@@ -186,7 +203,9 @@ def list_jobs(user: User = Depends(get_optional_user), db: Session = Depends(get
         "jobs": [
             {
                 "id": j.id, "status": j.status, "filename": j.filename,
-                "source": j.source, "error": j.error or None,
+                "source": j.source, "language": j.target_language or "en",
+                "aspect_ratio": j.aspect_ratio or "vertical_9_16",
+                "error": j.error or None,
                 "created_at": j.created_at.isoformat() if j.created_at else None,
                 "completed_at": j.completed_at.isoformat() if j.completed_at else None,
             }

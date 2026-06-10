@@ -16,6 +16,8 @@ from ..core.config import settings
 from ..core.transcriber import transcribe_video
 from ..core.analyst import analyze_transcript
 from ..core.video_editor import cut_video
+from ..core.translator import translate_transcript, is_supported_language
+from ..core.virality import score_clips
 from ..models.job import Job
 from ..services.job_queue import job_queue
 
@@ -119,7 +121,20 @@ def run_pipeline(job_id: str):
             _fail(job_id, "Transcription failed")
             return
 
-        # --- Analysis ---
+        # --- Translation (optional, for captions only) ---
+        target_lang = (job.target_language or "en").strip().lower()
+        caption_transcript = transcript  # original for analysis, translated for captions
+        if target_lang != "en" and is_supported_language(target_lang):
+            job_queue.add_thought(job_id, f"Translator: Translating captions to {target_lang}...")
+            t0 = time.perf_counter()
+            translated = translate_transcript(transcript, target_lang)
+            if translated and translated != transcript:
+                caption_transcript = translated
+                job_queue.add_thought(job_id, f"Translator: Translation to {target_lang} complete ({round(time.perf_counter() - t0, 1)}s).")
+            else:
+                job_queue.add_thought(job_id, "Translator: Translation skipped (model unavailable or already in target language).")
+
+        # --- Analysis (always on original transcript) ---
         job_queue.add_thought(job_id, "Semantic Analysis: Parsing transcript for 'scroll-stopper' moments...")
         t0 = time.perf_counter()
         analysis = analyze_transcript(transcript, video_path)
@@ -152,9 +167,10 @@ def run_pipeline(job_id: str):
             job_id,
             job_queue._active_pids,
             thought_callback=lambda pid, msg: job_queue.add_thought(pid, msg),
-            transcript=transcript,
+            transcript=caption_transcript,
             endscreen_path=job.endscreen_path,
             cta_text=job.cta_text,
+            aspect_ratio=job.aspect_ratio or "vertical_9_16",
         )
         timing["cutting_seconds"] = round(time.perf_counter() - t0, 2)
         job_queue.add_thought(job_id, f"Timing: Clip rendering finished in {timing['cutting_seconds']}s.")
@@ -162,6 +178,18 @@ def run_pipeline(job_id: str):
         if not clips:
             _fail(job_id, "FFmpeg failed to generate clips")
             return
+
+        # --- Virality Scoring ---
+        job_queue.add_thought(job_id, "Virality Engine: Scoring clips for predicted performance...")
+        scored = score_clips(analysis.get("hooks", []), transcript)
+        if scored:
+            analysis["hooks"] = scored
+            avg_score = sum(h.get("virality_score", 0) for h in scored) / max(1, len(scored))
+            job_queue.add_thought(job_id, f"Virality Engine: Clips scored (avg: {avg_score:.0f}/100). Top clip: {max(scored, key=lambda h: h.get('virality_score', 0)).get('virality_score', 0):.0f}/100.")
+            for h in scored:
+                vs = h.get("virality_score", 0)
+                hn = h.get("hook_name", "Clip")
+                job_queue.add_thought(job_id, f"Virality Engine: {hn} — {vs:.0f}/100")
 
         # --- Success ---
         timing["total_seconds"] = round(time.perf_counter() - pipeline_t0, 2)
@@ -172,7 +200,7 @@ def run_pipeline(job_id: str):
             j = db.query(Job).filter(Job.id == job_id).first()
             if j:
                 j.status = "completed"
-                j.transcript = transcript
+                j.transcript = caption_transcript
                 j.analysis_json = json.dumps(analysis)
                 j.clips_json = json.dumps(clips)
                 j.timing_transcription = timing["transcription_seconds"]

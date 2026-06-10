@@ -409,8 +409,9 @@ def _write_clip_ass(ass_path: str, segments: List[Dict], clip_start: float, clip
         f.write("\n".join(ass_lines) + "\n")
     return True
 
-def _get_format_preset_filters() -> List[str]:
-    preset = (settings.CLIP_FORMAT_PRESET or "source").strip().lower()
+def _get_format_preset_filters(preset: str = "") -> List[str]:
+    if not preset:
+        preset = (settings.CLIP_FORMAT_PRESET or "source").strip().lower()
     return list(FORMAT_PRESET_FILTERS.get(preset, FORMAT_PRESET_FILTERS["source"]))
 
 def _ffmpeg_supports_filter(filter_name: str) -> bool:
@@ -508,9 +509,9 @@ def _build_caption_drawtext_filters(transcript_segments: List[Dict], clip_start:
     return filters
 
 
-def _build_ffmpeg_command(video_path: str, start: float, duration: float, output_path: str, subtitle_path: Optional[str], transcript_segments: List[Dict], process_id: str = None, thought_callback=None, clip_index: int = 0, enable_format: bool = True, enable_transitions: bool = True, enable_zoom: bool = True, enable_subtitles: bool = True, animated_captions: bool = True, cta_text: str = "", enable_cta: bool = True) -> List[str]:
+def _build_ffmpeg_command(video_path: str, start: float, duration: float, output_path: str, subtitle_path: Optional[str], transcript_segments: List[Dict], process_id: str = None, thought_callback=None, clip_index: int = 0, enable_format: bool = True, enable_transitions: bool = True, enable_zoom: bool = True, enable_subtitles: bool = True, animated_captions: bool = True, cta_text: str = "", enable_cta: bool = True, format_preset: str = "vertical_9_16") -> List[str]:
     cmd = ["ffmpeg", "-y", "-ss", str(start), "-t", str(duration), "-i", video_path]
-    vf_parts = _get_format_preset_filters() if enable_format else []
+    vf_parts = _get_format_preset_filters(format_preset) if enable_format else []
     af_parts = []
 
     if enable_transitions and settings.CLIP_ENABLE_TRANSITIONS:
@@ -919,7 +920,7 @@ def _append_endscreen_to_clip(clip_path: str, endscreen_path: str, cta_text: str
         return False
 
 
-def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active_pids: dict = None, thought_callback=None, transcript: Optional[str] = None, endscreen_path: Optional[str] = None, cta_text: str = "") -> List[str]:
+def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active_pids: dict = None, thought_callback=None, transcript: Optional[str] = None, endscreen_path: Optional[str] = None, cta_text: str = "", aspect_ratio: str = "vertical_9_16") -> List[str]:
     """Cuts a video into clips with PID tracking and live streaming."""
     output_clips = []
     raw_base_name = os.path.basename(video_path)
@@ -1047,6 +1048,7 @@ def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active
                     animated_captions=attempt["animated_captions"],
                     cta_text=hook_cta_text,
                     enable_cta=attempt["enable_cta"],
+                    format_preset=aspect_ratio,
                 )
 
                 success, last_output = _run_ffmpeg_command(cmd, process_id=process_id, active_pids=active_pids)

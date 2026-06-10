@@ -18,6 +18,8 @@ class Job(Base):
     cta_text = Column(String, default="Link in bio to try it free.")
     source = Column(String, default="upload")  # upload | drive
     drive_url = Column(String, default="")
+    target_language = Column(String, default="en")  # en | es | fr | de | etc.
+    aspect_ratio = Column(String, default="vertical_9_16")  # source | vertical_9_16 | square_1_1 | portrait_4_5 | landscape_16_9
 
     transcript = Column(Text, default="")
     analysis_json = Column(Text, default="")
