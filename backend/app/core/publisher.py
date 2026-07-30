@@ -1,46 +1,72 @@
-import json
+import builtins
 import os
 import time
-from datetime import datetime, UTC
-from typing import Dict, List
-import httpx
+import json
+from datetime import UTC, datetime
 from urllib.parse import quote
+
+import httpx
+from sqlalchemy.orm import Session
+
 from .config import settings
 
-SUPPORTED_PLATFORMS = ["tiktok", "instagram", "youtube"]
+SUPPORTED_PLATFORMS = ["tiktok", "instagram", "youtube", "twitter", "facebook", "linkedin"]
 
 MANUAL_UPLOAD_URL = {
     "tiktok": "https://www.tiktok.com/upload",
     "instagram": "https://www.instagram.com/create/select/",
     "youtube": "https://studio.youtube.com",
+    "twitter": "https://twitter.com/compose/tweet",
+    "facebook": "https://www.facebook.com/upload",
+    "linkedin": "https://www.linkedin.com/post/new",
 }
 
 
 class PublishHistoryStore:
-    def __init__(self, file_path: str):
-        self.file_path = file_path
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        if not os.path.exists(self.file_path):
-            with open(self.file_path, "w", encoding="utf-8") as f:
-                json.dump([], f)
+    def list(self, db: Session, user_id: int) -> builtins.list[dict]:
+        from ..models.publish_history import PublishHistory
 
-    def list(self) -> List[Dict]:
-        with open(self.file_path, "r", encoding="utf-8") as f:
-            try:
-                data = json.load(f)
-                return data if isinstance(data, list) else []
-            except Exception:
-                return []
+        rows = (
+            db.query(PublishHistory)
+            .filter(PublishHistory.user_id == user_id)
+            .order_by(PublishHistory.created_at.desc())
+            .all()
+        )
+        return [
+            {
+                "platform": r.platform,
+                "account_id": r.account_id,
+                "account_name": r.account_name,
+                "clip_filename": r.clip_filename,
+                "title": r.title,
+                "description": r.description,
+                "result": r.result,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ]
 
-    def append(self, row: Dict) -> Dict:
-        rows = self.list()
-        rows.append(row)
-        with open(self.file_path, "w", encoding="utf-8") as f:
-            json.dump(rows, f, indent=2)
+    def append(self, db: Session, row: dict) -> dict:
+        from ..models.publish_history import PublishHistory
+
+        record = PublishHistory(
+            user_id=row["user_id"],
+            platform=row["platform"],
+            account_id=row.get("account_id"),
+            account_name=row.get("account_name"),
+            clip_filename=row.get("clip_filename"),
+            title=row.get("title"),
+            description=row.get("description"),
+            result=row.get("result"),
+        )
+        db.add(record)
+        db.commit()
+        db.refresh(record)
+        row["id"] = record.id
         return row
 
 
-def publish_clip(platform: str, account: Dict, video_path: str, title: str, description: str) -> Dict:
+def publish_clip(platform: str, account: dict, video_path: str, title: str, description: str) -> dict:
     """
     Publishing orchestrator.
 
@@ -58,34 +84,48 @@ def publish_clip(platform: str, account: Dict, video_path: str, title: str, desc
 
     account_name = account.get("account_name", "Unknown account")
 
+    # Dev-mode deterministic publish for local testing
+    if os.getenv("DEV_PUBLISH_MOCK", "").lower() in ("1", "true", "yes"):
+        try:
+            return _dev_publish(platform, account, video_path, title, description)
+        except Exception:
+            # fall through to normal behavior on failure
+            pass
+
     if platform == "youtube":
         youtube_result = _publish_to_youtube(account, video_path, title, description)
         if youtube_result.get("status") == "published":
-            youtube_result.update({
-                "platform": platform,
-                "account_name": account_name,
-                "created_at": datetime.now(UTC).isoformat(),
-            })
+            youtube_result.update(
+                {
+                    "platform": platform,
+                    "account_name": account_name,
+                    "created_at": datetime.now(UTC).isoformat(),
+                }
+            )
             return youtube_result
 
     if platform == "instagram":
         instagram_result = _publish_to_instagram(account, video_path, title, description)
         if instagram_result.get("status") == "published":
-            instagram_result.update({
-                "platform": platform,
-                "account_name": account_name,
-                "created_at": datetime.now(UTC).isoformat(),
-            })
+            instagram_result.update(
+                {
+                    "platform": platform,
+                    "account_name": account_name,
+                    "created_at": datetime.now(UTC).isoformat(),
+                }
+            )
             return instagram_result
 
     if platform == "tiktok":
         tiktok_result = _publish_to_tiktok(account, video_path, title, description)
         if tiktok_result.get("status") in {"published", "submitted"}:
-            tiktok_result.update({
-                "platform": platform,
-                "account_name": account_name,
-                "created_at": datetime.now(UTC).isoformat(),
-            })
+            tiktok_result.update(
+                {
+                    "platform": platform,
+                    "account_name": account_name,
+                    "created_at": datetime.now(UTC).isoformat(),
+                }
+            )
             return tiktok_result
 
     return {
@@ -104,7 +144,41 @@ def publish_clip(platform: str, account: Dict, video_path: str, title: str, desc
     }
 
 
-def _publish_to_tiktok(account: Dict, video_path: str, title: str, description: str) -> Dict:
+def _dev_publish(platform: str, account: dict, video_path: str, title: str, description: str) -> dict:
+    """Write a deterministic publish record to the PUBLISH_LOG_PATH and return a 'published' result.
+
+    This is intended for local tests and CI where real platform credentials are not available.
+    Enable via `DEV_PUBLISH_MOCK=true` in the environment.
+    """
+    entry = {
+        "platform": platform,
+        "account": account.get("account_name") or account.get("id") or "dev",
+        "video_path": video_path,
+        "title": title,
+        "description": description,
+        "status": "published",
+        "mock_url": f"http://{(settings.PUBLIC_BASE_URL or 'localhost').lstrip('http://').lstrip('https://')}/mock/{int(time.time())}",
+        "created_at": datetime.now(UTC).isoformat(),
+    }
+
+    log_path = settings.PUBLISH_LOG_PATH
+    try:
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        # append as JSON lines for easy consumption
+        with open(log_path, "a") as f:
+            f.write(json.dumps(entry) + "\n")
+    except Exception:
+        # ignore logging errors in dev mock
+        pass
+
+    return {
+        "status": "published",
+        "video_url": entry["mock_url"],
+        "message": "Dev-mode mock published",
+    }
+
+
+def _publish_to_tiktok(account: dict, video_path: str, title: str, description: str) -> dict:
     api_base = settings.TIKTOK_API_BASE.strip().rstrip("/")
     client_key = settings.TIKTOK_CLIENT_KEY.strip()
     client_secret = settings.TIKTOK_CLIENT_SECRET.strip()
@@ -209,7 +283,7 @@ def _tiktok_refresh_access_token(api_base: str, client_key: str, client_secret: 
         return data.get("access_token", "") or data.get("data", {}).get("access_token", "")
 
 
-def _publish_to_instagram(account: Dict, video_path: str, title: str, description: str) -> Dict:
+def _publish_to_instagram(account: dict, video_path: str, title: str, description: str) -> dict:
     user_id = (account.get("instagram_user_id") or "").strip()
     access_token = (account.get("instagram_access_token") or "").strip()
     public_base = settings.PUBLIC_BASE_URL.strip().rstrip("/")
@@ -313,7 +387,7 @@ def _wait_instagram_container_ready(client: httpx.Client, graph_base: str, creat
     return "TIMEOUT"
 
 
-def _publish_to_youtube(account: Dict, video_path: str, title: str, description: str) -> Dict:
+def _publish_to_youtube(account: dict, video_path: str, title: str, description: str) -> dict:
     refresh_token = (account.get("oauth_refresh_token") or "").strip()
     if not refresh_token:
         return {
