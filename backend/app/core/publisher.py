@@ -33,6 +33,18 @@ def _attach_result_url(result: dict) -> dict:
     return result
 
 
+def _build_auth_source(account: dict, platform: str) -> str:
+    if platform == "youtube":
+        return "system" if not (account.get("oauth_refresh_token") or "").strip() and bool(settings.SYSTEM_YOUTUBE_REFRESH_TOKEN) else "account"
+    if platform == "tiktok":
+        has_account_tokens = bool((account.get("tiktok_access_token") or "").strip() or (account.get("tiktok_refresh_token") or "").strip())
+        has_system_tokens = bool(settings.SYSTEM_TIKTOK_ACCESS_TOKEN or settings.SYSTEM_TIKTOK_REFRESH_TOKEN)
+        return "system" if not has_account_tokens and has_system_tokens else "account"
+    if platform == "instagram":
+        return "system" if not (account.get("instagram_access_token") or "").strip() and bool(settings.SYSTEM_INSTAGRAM_ACCESS_TOKEN) else "account"
+    return "account"
+
+
 class PublishHistoryStore:
     def list(self, db: Session, user_id: int) -> builtins.list[dict]:
         from ..models.publish_history import PublishHistory
@@ -104,6 +116,7 @@ def publish_clip(platform: str, account: dict, video_path: str, title: str, desc
                     "platform": platform,
                     "account_name": account_name,
                     "created_at": datetime.now(UTC).isoformat(),
+                    "auth_source": "mock",
                 }
             )
             return _attach_result_url(result)
@@ -119,6 +132,7 @@ def publish_clip(platform: str, account: dict, video_path: str, title: str, desc
                     "platform": platform,
                     "account_name": account_name,
                     "created_at": datetime.now(UTC).isoformat(),
+                    "auth_source": _build_auth_source(account, platform),
                 }
             )
             return _attach_result_url(youtube_result)
@@ -131,6 +145,7 @@ def publish_clip(platform: str, account: dict, video_path: str, title: str, desc
                     "platform": platform,
                     "account_name": account_name,
                     "created_at": datetime.now(UTC).isoformat(),
+                    "auth_source": _build_auth_source(account, platform),
                 }
             )
             return _attach_result_url(instagram_result)
@@ -143,6 +158,7 @@ def publish_clip(platform: str, account: dict, video_path: str, title: str, desc
                     "platform": platform,
                     "account_name": account_name,
                     "created_at": datetime.now(UTC).isoformat(),
+                    "auth_source": _build_auth_source(account, platform),
                 }
             )
             return _attach_result_url(tiktok_result)
@@ -155,6 +171,7 @@ def publish_clip(platform: str, account: dict, video_path: str, title: str, desc
         "title": title,
         "description": description,
         "video_path": video_path,
+        "auth_source": "manual",
         "message": (
             "Official auto-publish needs platform app credentials and approval. "
             "Open upload URL while logged into the selected account and upload this generated clip."
@@ -195,6 +212,7 @@ def _dev_publish(platform: str, account: dict, video_path: str, title: str, desc
         "video_url": entry["mock_url"],
         "mock_url": entry["mock_url"],
         "result_url": entry["mock_url"],
+        "auth_source": "mock",
         "message": "Dev-mode mock published",
     }
 

@@ -612,8 +612,9 @@
         const publishObj = result.publish || result;
         const res = publishObj.result || publishObj;
         const resultUrl = res.result_url || res.video_url || res.mock_url || res.upload_url || null;
+        const authSource = res.auth_source || 'account';
         if (resultUrl) {
-          showPublishResult(resultUrl);
+          showPublishResult(resultUrl, authSource);
         } else {
           showToast(`Published to ${platform} successfully`, 'success');
         }
@@ -629,14 +630,20 @@
     }
   };
 
-  function showPublishResult(url) {
+  function showPublishResult(url, authSource = 'account') {
     const modal = document.createElement('div');
     modal.className = 'modal';
     modal.id = 'publish-result-modal';
+    const note = authSource === 'system'
+      ? 'Used the configured system credentials for this publish.'
+      : authSource === 'mock'
+        ? 'Used local mock publishing for this test run.'
+        : 'Used the connected account for this publish.';
     modal.innerHTML = `
       <div class="modal-content">
         <h3>Publish Result</h3>
-        <p>Published successfully. View: <a href="${escHtml(url)}" target="_blank" rel="noopener">${escHtml(url)}</a></p>
+        <p>${escHtml(note)}</p>
+        <p>View: <a href="${escHtml(url)}" target="_blank" rel="noopener">${escHtml(url)}</a></p>
         <div style="text-align:right;margin-top:0.5rem"><button id="publish-result-close" class="btn">Close</button></div>
       </div>
     `;

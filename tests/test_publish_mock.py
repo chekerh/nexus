@@ -86,3 +86,4 @@ def test_publish_uses_system_credentials_when_account_has_none(monkeypatch, tmp_
     assert result.get("status") == "published"
     assert result.get("video_id") == "system-video-id"
     assert result.get("video_url") == "https://www.youtube.com/watch?v=system-video-id"
+    assert result.get("auth_source") == "system"
