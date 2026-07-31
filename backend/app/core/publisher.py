@@ -199,6 +199,25 @@ def _dev_publish(platform: str, account: dict, video_path: str, title: str, desc
     }
 
 
+def _resolve_account_value(account: dict, key: str, fallback: str = "") -> str:
+    value = (account.get(key) or "").strip()
+    if value:
+        return value
+    if key == "oauth_refresh_token":
+        return (settings.SYSTEM_YOUTUBE_REFRESH_TOKEN or "").strip()
+    if key == "tiktok_access_token":
+        return (settings.SYSTEM_TIKTOK_ACCESS_TOKEN or "").strip()
+    if key == "tiktok_refresh_token":
+        return (settings.SYSTEM_TIKTOK_REFRESH_TOKEN or "").strip()
+    if key == "tiktok_open_id":
+        return (settings.SYSTEM_TIKTOK_OPEN_ID or "").strip()
+    if key == "instagram_access_token":
+        return (settings.SYSTEM_INSTAGRAM_ACCESS_TOKEN or "").strip()
+    if key == "instagram_user_id":
+        return (settings.SYSTEM_INSTAGRAM_USER_ID or "").strip()
+    return fallback
+
+
 def _publish_to_tiktok(account: dict, video_path: str, title: str, description: str) -> dict:
     api_base = settings.TIKTOK_API_BASE.strip().rstrip("/")
     client_key = settings.TIKTOK_CLIENT_KEY.strip()
@@ -221,8 +240,8 @@ def _publish_to_tiktok(account: dict, video_path: str, title: str, description: 
             "message": "Set PUBLIC_BASE_URL to a publicly reachable URL so TikTok can fetch media.",
         }
 
-    access_token = (account.get("tiktok_access_token") or "").strip()
-    refresh_token = (account.get("tiktok_refresh_token") or "").strip()
+    access_token = _resolve_account_value(account, "tiktok_access_token")
+    refresh_token = _resolve_account_value(account, "tiktok_refresh_token")
 
     if not access_token and refresh_token:
         access_token = _tiktok_refresh_access_token(api_base, client_key, client_secret, refresh_token)
@@ -305,8 +324,8 @@ def _tiktok_refresh_access_token(api_base: str, client_key: str, client_secret: 
 
 
 def _publish_to_instagram(account: dict, video_path: str, title: str, description: str) -> dict:
-    user_id = (account.get("instagram_user_id") or "").strip()
-    access_token = (account.get("instagram_access_token") or "").strip()
+    user_id = _resolve_account_value(account, "instagram_user_id")
+    access_token = _resolve_account_value(account, "instagram_access_token")
     public_base = settings.PUBLIC_BASE_URL.strip().rstrip("/")
     if not user_id or not access_token:
         return {
@@ -409,7 +428,7 @@ def _wait_instagram_container_ready(client: httpx.Client, graph_base: str, creat
 
 
 def _publish_to_youtube(account: dict, video_path: str, title: str, description: str) -> dict:
-    refresh_token = (account.get("oauth_refresh_token") or "").strip()
+    refresh_token = _resolve_account_value(account, "oauth_refresh_token")
     if not refresh_token:
         return {
             "status": "manual_required",
