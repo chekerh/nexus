@@ -45,6 +45,7 @@ def test_publish_mock(client, db, test_user, auth_headers, tmp_path, monkeypatch
     assert "publish" in data
     result = data["publish"]["result"]
     assert result.get("status") == "published"
+    assert result.get("result_url")
     assert "mock" in result.get("video_url")
 
     # Ensure publish log was written

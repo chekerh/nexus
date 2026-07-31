@@ -611,9 +611,9 @@
       try {
         const publishObj = result.publish || result;
         const res = publishObj.result || publishObj;
-        const videoUrl = res.video_url || res.mock_url || (res.video_url && res.video_url.video_url) || null;
-        if (videoUrl) {
-          showPublishResult(videoUrl);
+        const resultUrl = res.result_url || res.video_url || res.mock_url || res.upload_url || null;
+        if (resultUrl) {
+          showPublishResult(resultUrl);
         } else {
           showToast(`Published to ${platform} successfully`, 'success');
         }

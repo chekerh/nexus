@@ -22,6 +22,17 @@ MANUAL_UPLOAD_URL = {
 }
 
 
+def _attach_result_url(result: dict) -> dict:
+    if not isinstance(result, dict):
+        return result
+    if result.get("result_url"):
+        return result
+    url = result.get("video_url") or result.get("mock_url") or result.get("upload_url")
+    if url:
+        result["result_url"] = url
+    return result
+
+
 class PublishHistoryStore:
     def list(self, db: Session, user_id: int) -> builtins.list[dict]:
         from ..models.publish_history import PublishHistory
@@ -87,7 +98,15 @@ def publish_clip(platform: str, account: dict, video_path: str, title: str, desc
     # Dev-mode deterministic publish for local testing
     if os.getenv("DEV_PUBLISH_MOCK", "").lower() in ("1", "true", "yes"):
         try:
-            return _dev_publish(platform, account, video_path, title, description)
+            result = _dev_publish(platform, account, video_path, title, description)
+            result.update(
+                {
+                    "platform": platform,
+                    "account_name": account_name,
+                    "created_at": datetime.now(UTC).isoformat(),
+                }
+            )
+            return _attach_result_url(result)
         except Exception:
             # fall through to normal behavior on failure
             pass
@@ -102,7 +121,7 @@ def publish_clip(platform: str, account: dict, video_path: str, title: str, desc
                     "created_at": datetime.now(UTC).isoformat(),
                 }
             )
-            return youtube_result
+            return _attach_result_url(youtube_result)
 
     if platform == "instagram":
         instagram_result = _publish_to_instagram(account, video_path, title, description)
@@ -114,7 +133,7 @@ def publish_clip(platform: str, account: dict, video_path: str, title: str, desc
                     "created_at": datetime.now(UTC).isoformat(),
                 }
             )
-            return instagram_result
+            return _attach_result_url(instagram_result)
 
     if platform == "tiktok":
         tiktok_result = _publish_to_tiktok(account, video_path, title, description)
@@ -126,9 +145,9 @@ def publish_clip(platform: str, account: dict, video_path: str, title: str, desc
                     "created_at": datetime.now(UTC).isoformat(),
                 }
             )
-            return tiktok_result
+            return _attach_result_url(tiktok_result)
 
-    return {
+    return _attach_result_url({
         "status": "manual_required",
         "platform": platform,
         "account_name": account_name,
@@ -141,7 +160,7 @@ def publish_clip(platform: str, account: dict, video_path: str, title: str, desc
             "Open upload URL while logged into the selected account and upload this generated clip."
         ),
         "created_at": datetime.now(UTC).isoformat(),
-    }
+    })
 
 
 def _dev_publish(platform: str, account: dict, video_path: str, title: str, description: str) -> dict:
@@ -174,6 +193,8 @@ def _dev_publish(platform: str, account: dict, video_path: str, title: str, desc
     return {
         "status": "published",
         "video_url": entry["mock_url"],
+        "mock_url": entry["mock_url"],
+        "result_url": entry["mock_url"],
         "message": "Dev-mode mock published",
     }
 
