@@ -1,52 +1,72 @@
-# Publishing guide — YouTube, TikTok, Instagram (dev + real)
+# Publishing Guide
 
-This document explains how to configure and test publishing from Nexus-UGC locally.
+How publishing works today in Nexus-UGC:
 
-Prerequisites
-- Run the app locally: `./run_app.sh` (started uvicorn at http://127.0.0.1:8000).
-- Install `ngrok` if you need an externally reachable `PUBLIC_BASE_URL` for OAuth callbacks.
-- Make sure `ffmpeg` is installed for video processing.
+- The UI sends `POST /api/v1/publish` with `platform`, `account_id`, `clip_filename`, `title`, and `description`.
+- The backend looks up the connected `SocialAccount`, validates the clip exists under `UPLOAD_DIR/clips`, and then tries the platform-specific publisher.
+- If `DEV_PUBLISH_MOCK=true`, the app returns a deterministic published result and writes a log entry for local and CI testing.
+- If platform credentials are missing or the provider rejects the request, the API returns `manual_required` with the platform upload URL.
 
-Key environment variables
-- `PUBLIC_BASE_URL` — public URL for callbacks (e.g. https://abc.ngrok.io). Optional for local manual flows.
-- `YOUTUBE_CLIENT_ID` and `YOUTUBE_CLIENT_SECRET` — Google OAuth app for YouTube uploads.
-- `TIKTOK_CLIENT_KEY` and `TIKTOK_CLIENT_SECRET` — TikTok Open Platform app credentials.
-- `SYSTEM_YOUTUBE_REFRESH_TOKEN` — (optional) system-level refresh token to enable direct posting without OAuth per-user.
-- `SYSTEM_TIKTOK_*`, `SYSTEM_INSTAGRAM_*` — system-level tokens the app can use for automated posting.
+## Local setup
 
-Where the app exposes flows
-- OAuth: `/api/v1/oauth/*` — endpoints to start OAuth flows for YouTube, TikTok, Instagram.
-  - Example: `GET /api/v1/oauth/youtube/authorize` opens the Google OAuth flow.
-- Publish API: `POST /api/v1/publish` — publish a clip to a platform. See backend API for JSON schema.
+Prerequisites:
 
-Quick dev-mode test (no API keys)
-1. Start the app locally: `./run_app.sh`.
-2. Create a clip via the frontend or upload a video to `backend/data/uploads`.
-3. Use the publish API to exercise the publish path with dev fallback (mock/manual instructions are returned when platform keys are missing):
+- Run the app with `./run_app.sh`.
+- Install `ffmpeg`.
+- Use `PUBLIC_BASE_URL` only when you need OAuth callbacks or external platform fetches.
+
+Key environment variables:
+
+- `JWT_SECRET` and `ENCRYPTION_KEY` for auth and token storage.
+- `PUBLIC_BASE_URL` for OAuth redirects and public media URLs.
+- `YOUTUBE_CLIENT_ID` / `YOUTUBE_CLIENT_SECRET` for YouTube OAuth.
+- `TIKTOK_CLIENT_KEY` / `TIKTOK_CLIENT_SECRET` for TikTok OAuth.
+- `FACEBOOK_CLIENT_ID` / `FACEBOOK_CLIENT_SECRET` for Instagram OAuth.
+- `LINKEDIN_CLIENT_ID` / `LINKEDIN_CLIENT_SECRET` for LinkedIn OAuth.
+- `SYSTEM_ACCOUNTS_ENABLED=true` plus `SYSTEM_*` token variables if you want startup to auto-provision system accounts.
+
+## OAuth flows
+
+- YouTube: `GET /api/v1/oauth/youtube/authorize` and `/callback`
+- TikTok: `GET /api/v1/oauth/tiktok/authorize` and `/callback`
+- Instagram: `GET /api/v1/oauth/instagram/authorize` and `/callback`
+- Twitter, Facebook, and LinkedIn are also wired in the API for account connection and future publish expansion.
+
+## Fast dev test
+
+1. Start the app.
+2. Create or connect a social account.
+3. Place a clip under `UPLOAD_DIR/clips`.
+4. Enable mock publishing and call the API:
 
 ```bash
-curl -X POST "http://127.0.0.1:8000/api/v1/publish" \
-  -H "Content-Type: application/json" \
-  -d '{"platform":"youtube","title":"Test","description":"dev publish","video_path":"/path/to/video.mp4"}'
+export DEV_PUBLISH_MOCK=true
+curl -X POST http://127.0.0.1:8000/api/v1/publish \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer <token>' \
+  -d '{
+    "platform": "youtube",
+    "account_id": "<account-id>",
+    "clip_filename": "sample.mp4",
+    "title": "Test publish",
+    "description": "Local verification"
+  }'
 ```
 
-Using system tokens for immediate posting
-- If you have valid tokens and want to bypass OAuth per-user flows, set the `SYSTEM_YOUTUBE_REFRESH_TOKEN` and `SYSTEM_YOUTUBE_CHANNEL_ID` in your `.env` and restart the app. The auto-publish worker and publish endpoints will use these tokens when available.
+## Real account path
 
-Testing with real accounts (high level)
-1. Create an OAuth app for the platform (Google Cloud Console for YouTube, TikTok Open Platform, Facebook/Meta for Instagram).
-2. Set `PUBLIC_BASE_URL` to your ngrok URL and configure the OAuth redirect URIs in the provider console:
-   - YouTube redirect: `https://<PUBLIC_BASE_URL>/api/v1/oauth/youtube/callback`
-3. Configure `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, etc., in `.env` and restart the app.
-4. In the UI, connect the account via the `Connect` / `Setup` pages or call the OAuth endpoints directly.
+1. Configure the provider app credentials.
+2. Set `PUBLIC_BASE_URL` to the public HTTPS URL that can receive callbacks.
+3. Connect the account from the Accounts page.
+4. Publish from the queue or the clip modal.
 
-Safety and notes
-- The app will not post to production accounts without valid tokens; you must manually provide API keys or approve OAuth flows.
-- Never commit `.env` or secrets to source control.
-- For CI, use encrypted secrets or a secrets manager.
+## Verification
 
-Next steps (suggested)
-- Add a dev-mode publish mock that records publish attempts to `backend/data/publish_history.json` and returns a deterministic published response for testing.
-- Add an integration test that uploads a small sample clip to `backend/data/uploads` and posts to `/api/v1/publish` using the mock.
+- `make smoke`
+- `python -m pytest -q tests/test_publish_mock.py tests/test_oauth.py tests/test_whop.py`
 
-If you want, I can implement the dev-mode mock and an integration test next.
+## Safety notes
+
+- Never commit secrets or `.env`.
+- Keep `PUBLIC_BASE_URL` unset for purely local manual testing.
+- Use the manual upload fallback if a provider app is not approved for direct posting.
