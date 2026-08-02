@@ -1,116 +1,209 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-i18n>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Nexus-UGC</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>N</text></svg>">
+  <meta name="description" content="Sign in to Nexus-UGC or create a free account. AI-powered viral video generation with 5 free credits/month.">
+  <meta property="og:title" content="Sign In — Nexus-UGC">
+  <meta property="og:description" content="Sign in to Nexus-UGC or create a free account. AI-powered viral video generation with 5 free credits/month.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <title>Sign In — Nexus-UGC</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="choko.css">
+  <meta name="theme-color" content="#0a0e17">
+  <meta name="robots" content="noindex">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-192.svg">
 </head>
 <body>
-    <div class="auth-page">
-        <div class="auth-card">
-            <div class="auth-logo">Nexus-UGC</div>
-            <p class="auth-subtitle">AI-Powered UGC Production System</p>
-            <div class="auth-tabs">
-                <button class="auth-tab active" id="tab-login">Sign In</button>
-                <button class="auth-tab" id="tab-register">Create Account</button>
-            </div>
-            <form id="auth-form" class="auth-form" onsubmit="return false;">
-                <div id="login-fields">
-                    <div class="form-field">
-                        <label>Email</label>
-                        <input id="auth-email" type="email" class="modern-input" placeholder="you@example.com" required>
-                    </div>
-                    <div class="form-field">
-                        <label>Password</label>
-                        <input id="auth-password" type="password" class="modern-input" placeholder="At least 8 characters" required>
-                    </div>
-                </div>
-                <div id="register-fields" style="display:none">
-                    <div class="form-field">
-                        <label>Email</label>
-                        <input id="reg-email" type="email" class="modern-input" placeholder="you@example.com" required>
-                    </div>
-                    <div class="form-field">
-                        <label>Display Name</label>
-                        <input id="reg-name" type="text" class="modern-input" placeholder="Your name (optional)">
-                    </div>
-                    <div class="form-field">
-                        <label>Password</label>
-                        <input id="reg-password" type="password" class="modern-input" placeholder="At least 8 characters" required>
-                    </div>
-                </div>
-                <button id="auth-submit" class="btn btn-primary" style="width:100%;margin-top:1rem">Sign In</button>
-                <div id="auth-error" class="auth-error hidden"></div>
-            </form>
-            <div id="skip-section">
-                <p class="auth-or">or</p>
-                <button class="btn btn-secondary" id="skip-auth-btn" style="width:100%">Continue Without Account</button>
-                <p class="auth-hint">Limited to 5 free credits. Login to unlock more.</p>
-            </div>
-        </div>
+  <a href="#main-content" class="skip-to-content" data-i18n="common.skip-to-content">Skip to content</a>
+  <noscript><div style="position:fixed;inset:0;z-index:9999;background:#05080f;color:#94a3b8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:2rem;text-align:center"><h1 style="color:#fff;font-size:1.5rem;margin:0">JavaScript Required</h1><p>Nexus-UGC requires JavaScript. Please enable it in your browser settings.</p></div></noscript>
+  <canvas id="particle-canvas"></canvas>
+
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <div class="brand-icon">N</div>
+      <a href="index.html"><span>Nexus<span class="gradient-text">UGC</span></span></a>
     </div>
-    <script src="api.js"></script>
-    <script>
-        const tabLogin = document.getElementById('tab-login');
-        const tabRegister = document.getElementById('tab-register');
-        const loginFields = document.getElementById('login-fields');
-        const registerFields = document.getElementById('register-fields');
-        const authSubmit = document.getElementById('auth-submit');
-        const authError = document.getElementById('auth-error');
-        const skipBtn = document.getElementById('skip-auth-btn');
+    <div class="navbar-actions">
+      <span class="user-email" id="user-email"></span>
+    </div>
+  </nav>
 
-        let isLogin = true;
+  <main id="main-content"><div class="login-page">
+    <div class="glass-card login-card">
+      <h1 class="gradient-text" id="auth-title" data-i18n="login.title">Welcome Back</h1>
+      <p class="login-subtitle" id="auth-subtitle" data-i18n="login.subtitle">Sign in to access your clips, accounts, and history.</p>
 
-        tabLogin.onclick = () => {
-            isLogin = true;
-            tabLogin.classList.add('active');
-            tabRegister.classList.remove('active');
-            loginFields.style.display = '';
-            registerFields.style.display = 'none';
-            authSubmit.textContent = 'Sign In';
-        };
+      <!-- Tab toggle: Login / Register -->
+      <div class="flex gap-1 mb-2">
+        <button class="btn btn-sm btn-primary" id="login-tab-btn" data-i18n="login.login-tab">Sign In</button>
+        <button class="btn btn-sm btn-ghost" id="register-tab-btn" data-i18n="login.register-tab">Create Account</button>
+      </div>
 
-        tabRegister.onclick = () => {
-            isLogin = false;
-            tabRegister.classList.add('active');
-            tabLogin.classList.remove('active');
-            loginFields.style.display = 'none';
-            registerFields.style.display = '';
-            authSubmit.textContent = 'Create Account';
-        };
+      <!-- Google Sign-In button (login mode) -->
+       <div id="google-signin-container" style="display:none;">
+         <div id="g_id_onload"
+           data-client_id=""
+           data-context="signin"
+           data-ux_mode="popup"
+           data-callback="handleGoogleCredential"
+           data-auto_prompt="false">
+         </div>
+         <div id="google-signin-button" class="g_id_signin"
+           data-type="standard"
+           data-shape="rectangular"
+           data-theme="outline"
+           data-text="sign_in_with"
+           data-size="large"
+           data-logo_alignment="left">
+         </div>
+       </div>
 
-        authSubmit.onclick = async () => {
-            authError.classList.add('hidden');
-            try {
-                if (isLogin) {
-                    const email = document.getElementById('auth-email').value;
-                    const password = document.getElementById('auth-password').value;
-                    if (!email || !password) throw new Error('Please fill in all fields');
-                    await login(email, password);
-                } else {
-                    const email = document.getElementById('reg-email').value;
-                    const password = document.getElementById('reg-password').value;
-                    const name = document.getElementById('reg-name').value;
-                    if (!email || !password) throw new Error('Please fill in all fields');
-                    if (password.length < 8) throw new Error('Password must be at least 8 characters');
-                    await register(email, password, name);
-                }
-                window.location.href = '/';
-            } catch (err) {
-                authError.textContent = err.message;
-                authError.classList.remove('hidden');
-            }
-        };
+      <div class="login-divider" data-i18n="login.or-divider">or</div>
 
-        skipBtn.onclick = () => {
-            window.location.href = '/';
-        };
+      <form id="login-form" novalidate>
+        <div class="form-group">
+          <label for="email-input" data-i18n="login.email-label">Email</label>
+          <input type="email" id="email-input" class="form-input" data-i18n-target="placeholder" data-i18n="login.email-placeholder" placeholder="you@example.com" required autocomplete="email">
+          <div class="field-error hidden" id="email-error"></div>
+        </div>
+        <div class="form-group">
+          <label for="password-input" data-i18n="login.password-label">Password</label>
+          <input type="password" id="password-input" class="form-input" data-i18n-target="placeholder" data-i18n="login.password-placeholder" placeholder="••••••••" required autocomplete="current-password" minlength="6">
+          <div class="field-error hidden" id="password-error"></div>
+          <div class="text-xs text-dim" style="margin-top:4px;"><a href="reset-password.html" style="color:var(--text-dim);" data-i18n="login.forgot-password">Forgot password?</a></div>
+        </div>
+        <div class="form-group" id="invite-key-group" style="display:none;">
+          <label for="invite-key-input" data-i18n="login.invite-key-label">Invite Key</label>
+          <input type="text" id="invite-key-input" class="form-input" data-i18n-target="placeholder" data-i18n="login.invite-key-placeholder" placeholder="nex-xxxxxxxx" autocomplete="off">
+          <span class="text-xs text-dim" data-i18n="login.invite-key-hint">Ask the admin for an invite key</span>
+        </div>
+        <div class="field-error hidden" id="form-error" style="margin-bottom:0.5rem"></div>
+        <button type="submit" class="btn btn-primary w-full" id="auth-btn" data-i18n="login.auth-btn-login">Sign In</button>
+      </form>
 
-        // Enter key support
-        document.getElementById('auth-form').onkeydown = (e) => {
-            if (e.key === 'Enter') authSubmit.click();
-        };
-    </script>
+      <p class="text-xs text-dim text-center mt-2" id="auth-switch-text">
+        <span data-i18n="login.switch-to-register">Don't have an account?</span>
+        <a href="#" id="switch-to-register" style="color:var(--cyan)" data-i18n="login.create-one">Create one</a>
+      </p>
+    </div>
+  </div></main>
+
+  <script src="i18n.js"></script>
+  <script src="api.js"></script>
+  <script defer src="ui.js"></script>
+  <script nonce="__CSP_NONCE__">
+    const googleSigninContainer = document.getElementById('google-signin-container');
+    fetch('/api/v1/auth/google-config')
+      .then(response => response.ok ? response.json() : { enabled: false, client_id: '' })
+      .then(config => {
+        if (!config.enabled || !config.client_id) return;
+        document.getElementById('g_id_onload').setAttribute('data-client_id', config.client_id);
+        const googleScript = document.createElement('script');
+        googleScript.src = 'https://accounts.google.com/gsi/client';
+        googleScript.defer = true;
+        document.head.appendChild(googleScript);
+        googleSigninContainer.style.display = 'block';
+      })
+      .catch(() => {
+        googleSigninContainer.style.display = 'none';
+      });
+
+    // Login/Register state
+    let isLogin = true;
+
+    function toggleMode() {
+      var t = function (k, f) { return (typeof __ === 'function' ? __(k, f) : f); };
+      isLogin = !isLogin;
+      document.getElementById('auth-title').textContent = isLogin ? t('login.title', 'Welcome Back') : t('login.register-title', 'Create Account');
+      document.getElementById('auth-subtitle').textContent = isLogin
+        ? t('login.subtitle', 'Sign in to access your clips, accounts, and history.')
+        : t('login.register-subtitle', 'Start your journey with Nexus-UGC. Free 5 credits included.');
+      document.getElementById('auth-btn').textContent = isLogin ? t('login.auth-btn-login', 'Sign In') : t('login.auth-btn-register', 'Create Account');
+      document.getElementById('auth-switch-text').innerHTML = isLogin
+        ? (t('login.switch-to-register', "Don't have an account?") + " <a href='#' id='switch-to-register' style='color:var(--cyan)'>" + t('login.create-one', 'Create one') + "</a>")
+        : (t('login.switch-to-login', "Already have an account?") + " <a href='#' id='switch-to-register' style='color:var(--cyan)'>" + t('login.sign-in-link', 'Sign in') + "</a>");
+      document.getElementById('login-tab-btn').className = 'btn btn-sm ' + (isLogin ? 'btn-primary' : 'btn-ghost');
+      document.getElementById('register-tab-btn').className = 'btn btn-sm ' + (!isLogin ? 'btn-primary' : 'btn-ghost');
+      document.getElementById('google-signin-button').style.display = isLogin ? 'block' : 'none';
+      document.getElementById('invite-key-group').style.display = isLogin ? 'none' : 'block';
+    }
+
+    document.getElementById('auth-switch-text').addEventListener('click', e => {
+      if (e.target.id === 'switch-to-register') { e.preventDefault(); toggleMode(); }
+    });
+    document.getElementById('login-tab-btn').addEventListener('click', () => { if (!isLogin) toggleMode(); });
+    document.getElementById('register-tab-btn').addEventListener('click', () => { if (isLogin) toggleMode(); });
+
+    // Google OAuth callback
+    async function handleGoogleCredential(response) {
+      var t = function (k, f) { return (typeof __ === 'function' ? __(k, f) : f); };
+      const btn = document.getElementById('auth-btn');
+      btn.disabled = true;
+      btn.textContent = t('login.signing-in', 'Signing in...');
+      try {
+        await googleAuth(response.credential);
+        window.location.href = 'index.html';
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = t('login.auth-btn-login', 'Sign In');
+      }
+    }
+
+    function showFieldError(fieldId, message) {
+      const input = document.getElementById(fieldId + '-input');
+      const err = document.getElementById(fieldId + '-error');
+      if (input) input.classList.add('input-error');
+      if (err) { err.textContent = message; err.classList.remove('hidden'); }
+    }
+
+    document.getElementById('login-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      clearFieldErrors();
+
+      var t = function (k, f) { return (typeof __ === 'function' ? __(k, f) : f); };
+      const email = document.getElementById('email-input').value.trim();
+      const password = document.getElementById('password-input').value;
+      const inviteKey = document.getElementById('invite-key-input')?.value || '';
+
+      // Client-side validation
+      if (!validateForm({
+        'email-input': { required: true, pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: t('login.valid-email', 'Please enter a valid email address'), label: t('login.email-label', 'Email') },
+        'password-input': { required: true, minLength: 6, message: t('login.password-minlength', 'Password must be at least 6 characters'), label: t('login.password-label', 'Password') },
+      })) return;
+      if (!isLogin && !inviteKey) { showFieldError('form', t('login.invite-key-required', 'Invite key is required to create an account')); return; }
+
+      const btn = document.getElementById('auth-btn');
+      btn.disabled = true;
+      btn.classList.add('btn-loading');
+      btn.textContent = isLogin ? t('login.signing-in', 'Signing in...') : t('login.creating-account', 'Creating account...');
+      try {
+        if (isLogin) {
+          await login(email, password);
+        } else {
+          await register(email, password, '', inviteKey);
+        }
+        window.location.href = 'index.html';
+      } catch (err) {
+        showFieldError('form', err.message);
+      } finally {
+        btn.disabled = false;
+        btn.classList.remove('btn-loading');
+        btn.textContent = isLogin ? t('login.auth-btn-login', 'Sign In') : t('login.auth-btn-register', 'Create Account');
+      }
+    });
+  </script>
+  <script defer src="choko-knowledge.js"></script>
+  <script defer src="choko.js"></script>
 </body>
 </html>

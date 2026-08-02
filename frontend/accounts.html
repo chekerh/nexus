@@ -1,189 +1,424 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-i18n>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Account Groups - Nexus-UGC</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>N</text></svg>">
+  <meta name="description" content="Manage your connected social media accounts. Link YouTube, TikTok, Instagram, Twitter, and more.">
+  <meta property="og:title" content="Accounts — Nexus-UGC">
+  <meta property="og:description" content="Manage your connected social media accounts. Link YouTube, TikTok, Instagram, Twitter, and more.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <title>Accounts — Nexus-UGC</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="choko.css">
+  <meta name="theme-color" content="#0a0e17">
+  <meta name="robots" content="noindex">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-192.svg">
 </head>
 <body>
-    <div class="app-container">
-        <!-- Sidebar -->
-        <aside class="sidebar">
-            <div class="logo">Nexus-UGC</div>
-            <nav>
-                <a href="index.html" class="nav-item">AI Pipeline</a>
-                <a href="accounts.html" class="nav-item active">Account Groups</a>
-                <a href="#" class="nav-item disabled">History</a>
-            </nav>
+  <a href="#main-content" class="skip-to-content" data-i18n="common.skip-to-content">Skip to content</a>
+  <noscript><div style="position:fixed;inset:0;z-index:9999;background:#05080f;color:#94a3b8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:2rem;text-align:center"><h1 style="color:#fff;font-size:1.5rem;margin:0">JavaScript Required</h1><p>Nexus-UGC requires JavaScript. Please enable it in your browser settings.</p></div></noscript>
+  <canvas id="particle-canvas"></canvas>
 
-            <section class="card sidebar-runtime" id="runtime-panel">
-                <h3>AI Runtime</h3>
-                <p class="accounts-subtitle" id="backend-status-label">Backend: checking...</p>
-                <button class="btn btn-secondary" id="unload-backend-btn">Release AI Memory</button>
-            </section>
-
-            <div class="user-section" id="user-section">
-                <span class="user-email" id="user-email"></span>
-                <button class="user-btn" id="login-btn">Sign In</button>
-                <button class="user-btn hidden" id="logout-btn">Logout</button>
-            </div>
-        </aside>
-
-        <!-- Main Content - Account Groups Dashboard -->
-        <main class="main-content">
-            <header class="page-header">
-                <div class="page-header-content">
-                    <div class="page-icon">👥</div>
-                    <div class="page-title-group">
-                        <h1>Account Groups</h1>
-                        <p>Manage your social media accounts and organize them into groups for bulk publishing.</p>
-                    </div>
-                </div>
-                <div class="page-stats" id="page-stats">
-                    <div class="stat-item">
-                        <span class="stat-value" id="stat-groups">0</span>
-                        <span class="stat-label">Groups</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-value" id="stat-accounts">0</span>
-                        <span class="stat-label">Accounts</span>
-                    </div>
-                </div>
-            </header>
-
-            <div class="dashboard-grid">
-                <!-- Create Group Card -->
-                <section class="dashboard-card create-card">
-                    <div class="card-header">
-                        <span class="card-icon">📁</span>
-                        <h3>Create New Group</h3>
-                    </div>
-                    <p class="card-description">Create a group to organize your accounts (e.g., "Personal", "Brand", "Clients")</p>
-                    <div class="create-form">
-                        <div class="form-field">
-                            <label>Group Name</label>
-                            <input id="group-name" type="text" placeholder="e.g., Personal Accounts" class="modern-input">
-                        </div>
-                        <div class="form-field">
-                            <label>Description <span class="optional">(optional)</span></label>
-                            <input id="group-description" type="text" placeholder="What this group is for" class="modern-input">
-                        </div>
-                        <button class="btn btn-primary" id="add-group-btn">
-                            <span class="btn-icon">✨</span> Create Group
-                        </button>
-                    </div>
-                </section>
-
-                <!-- Add Account Card -->
-                <section class="dashboard-card create-card">
-                    <div class="card-header">
-                        <span class="card-icon">🔐</span>
-                        <h3>Add Account</h3>
-                    </div>
-                    <p class="card-description">Add a new social media account to your collection</p>
-                    <div class="create-form">
-                        <div class="form-row">
-                            <div class="form-field">
-                                <label>Platform</label>
-                                <select id="account-platform" class="modern-select">
-                                    <option value="tiktok">TikTok</option>
-                                    <option value="instagram">Instagram</option>
-                                    <option value="youtube">YouTube</option>
-                                </select>
-                            </div>
-                            <div class="form-field flex-2">
-                                <label>Account Name</label>
-                                <input id="account-name" type="text" placeholder="e.g., @mybrand" class="modern-input">
-                            </div>
-                        </div>
-                        <div class="form-field">
-                            <label>Notes <span class="optional">(optional)</span></label>
-                            <input id="account-notes" type="text" placeholder="Any notes about this account" class="modern-input">
-                        </div>
-                        <div id="credential-fields">
-                            <!-- YouTube Fields -->
-                            <div class="credential-section hidden" data-platform="youtube">
-                                <div class="form-field">
-                                    <label>YouTube Refresh Token <span class="optional">(for auto-publish)</span></label>
-                                    <input id="account-refresh-token" type="password" placeholder="Refresh token" class="modern-input">
-                                </div>
-                                <div class="form-field">
-                                    <label>Privacy Setting</label>
-                                    <select id="account-youtube-privacy" class="modern-select">
-                                        <option value="private">Private</option>
-                                        <option value="unlisted">Unlisted</option>
-                                        <option value="public">Public</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <!-- Instagram Fields -->
-                            <div class="credential-section hidden" data-platform="instagram">
-                                <div class="form-field">
-                                    <label>Instagram User ID</label>
-                                    <input id="account-instagram-user-id" type="text" placeholder="User ID for API publishing" class="modern-input">
-                                </div>
-                                <div class="form-field">
-                                    <label>Access Token</label>
-                                    <input id="account-instagram-token" type="password" placeholder="Long-lived access token" class="modern-input">
-                                </div>
-                            </div>
-                            <!-- TikTok Fields -->
-                            <div class="credential-section hidden" data-platform="tiktok">
-                                <div class="form-field">
-                                    <label>Open ID <span class="optional"></span></label>
-                                    <input id="account-tiktok-open-id" type="text" placeholder="TikTok Open ID" class="modern-input">
-                                </div>
-                                <div class="form-field">
-                                    <label>Refresh Token <span class="optional">(preferred)</span></label>
-                                    <input id="account-tiktok-refresh-token" type="password" placeholder="Refresh token" class="modern-input">
-                                </div>
-                                <div class="form-field">
-                                    <label>Access Token <span class="optional">(alternative)</span></label>
-                                    <input id="account-tiktok-access-token" type="password" placeholder="Access token" class="modern-input">
-                                </div>
-                            </div>
-                        </div>
-                        <button class="btn btn-secondary" id="add-account-btn">Add Account</button>
-                    </div>
-                </section>
-
-                <!-- Groups List -->
-                <section class="dashboard-card full-width">
-                    <div class="card-header">
-                        <span class="card-icon">📂</span>
-                        <h3>Your Groups</h3>
-                    </div>
-                    <div id="groups-list" class="groups-grid">
-                        <div class="empty-state">
-                            <span class="empty-icon">📭</span>
-                            <p>No groups yet. Create your first group above!</p>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- All Accounts List -->
-                <section class="dashboard-card full-width">
-                    <div class="card-header">
-                        <span class="card-icon">🌐</span>
-                        <h3>All Accounts</h3>
-                    </div>
-                    <div id="accounts-list" class="accounts-grid">
-                        <div class="empty-state">
-                            <span class="empty-icon">👤</span>
-                            <p>No accounts yet. Add your first account above!</p>
-                        </div>
-                    </div>
-                </section>
-            </div>
-        </main>
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <div class="brand-icon">N</div>
+      <a href="index.html"><span>Nexus<span class="gradient-text">UGC</span></span></a>
     </div>
+    <button class="mobile-nav-toggle" aria-label="Toggle navigation">☰</button>
+    <div class="navbar-actions">
+      <span class="user-email" id="user-email"></span>
+      <button class="btn btn-ghost btn-sm" id="login-btn" data-i18n="common.sign-in">Sign In</button>
+      <button class="btn btn-ghost btn-sm hidden" id="logout-btn" data-i18n="common.logout">Logout</button>
+    </div>
+  </nav>
 
-    <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
-    <script src="api.js"></script>
-    <script src="accounts.js"></script>
+  <div class="app-layout">
+    <aside class="sidebar">
+      <nav class="sidebar-nav">
+        <a href="index.html">📊 <span class="nav-label" data-i18n="nav.dashboard">Dashboard</span></a>
+        <a href="brainrot.html">🧠 <span class="nav-label" data-i18n="nav.brainrot">Brain Rot</span></a>
+        <a href="queue.html">📋 <span class="nav-label" data-i18n="nav.queue">Post Queue</span></a>
+        <a href="templates.html">📋 <span class="nav-label" data-i18n="nav.templates">Templates</span></a>
+        <a href="calendar.html">📅 <span class="nav-label" data-i18n="nav.calendar">Calendar</span></a>
+        <a href="personas.html">👤 <span class="nav-label" data-i18n="nav.personas">Personas</span></a>
+        <a href="campaigns.html">🎯 <span class="nav-label" data-i18n="nav.campaigns">Campaigns</span></a>
+        <div class="sidebar-divider"></div>
+        <a href="#" class="active">🔗 <span class="nav-label" data-i18n="nav.accounts">Accounts</span></a>
+        <a href="setup.html">⚙️ <span class="nav-label" data-i18n="nav.setup">Setup</span></a>
+        <div class="sidebar-divider"></div>
+        <a href="billing.html">💳 <span class="nav-label" data-i18n="nav.billing">Billing</span></a>
+        <a href="settings.html">⚙️ <span class="nav-label" data-i18n="nav.settings">Settings</span></a>
+        <a href="admin-login.html">🔐 <span class="nav-label" data-i18n="nav.admin">Admin</span></a>
+      </nav>
+    </aside>
+
+    <main class="main-area" id="main-content">
+      <div class="page-header">
+        <div>
+          <h1>Social <span class="gradient-text">Accounts</span></h1>
+          <p>Connect your social platforms and publish directly from Nexus-UGC.</p>
+        </div>
+        <div class="quick-actions">
+          <button class="btn btn-primary btn-sm" id="add-account-btn">+ Add Account</button>
+        </div>
+      </div>
+
+      <!-- OAuth Quick-Connect Buttons -->
+      <div class="stats-grid" style="margin-bottom:1.5rem;">
+        <div class="stat-card" style="text-align:center;cursor:pointer;" data-oauth="youtube" tabindex="0" role="button" aria-label="Connect YouTube">
+          <div style="font-size:2rem;margin-bottom:0.25rem;">▶️</div>
+          <div class="stat-card-label">YouTube</div>
+          <div class="text-dim text-xs">OAuth Connect</div>
+        </div>
+        <div class="stat-card" style="text-align:center;cursor:pointer;" data-oauth="tiktok" tabindex="0" role="button" aria-label="Connect TikTok">
+          <div style="font-size:2rem;margin-bottom:0.25rem;">🎵</div>
+          <div class="stat-card-label">TikTok</div>
+          <div class="text-dim text-xs">OAuth Connect</div>
+        </div>
+        <div class="stat-card" style="text-align:center;cursor:pointer;" data-oauth="instagram" tabindex="0" role="button" aria-label="Connect Instagram">
+          <div style="font-size:2rem;margin-bottom:0.25rem;">📸</div>
+          <div class="stat-card-label">Instagram</div>
+          <div class="text-dim text-xs">OAuth Connect</div>
+        </div>
+        <div class="stat-card" style="text-align:center;cursor:pointer;" data-oauth="twitter" tabindex="0" role="button" aria-label="Connect Twitter">
+          <div style="font-size:2rem;margin-bottom:0.25rem;">🐦</div>
+          <div class="stat-card-label">X / Twitter</div>
+          <div class="text-dim text-xs">OAuth Connect</div>
+        </div>
+      </div>
+
+      <div class="accounts-grid" id="accounts-list">
+        <div class="empty-state" style="grid-column:1/-1;">
+          <div class="empty-state-icon">🔗</div>
+          <h3>Loading accounts...</h3>
+          <div class="loading-pulse" style="text-align:center;color:var(--text-dim);font-size:0.875rem;">Connecting to your social platforms...</div>
+        </div>
+      </div>
+
+      <div class="mt-3">
+        <h2 style="font-size:1.35rem;font-weight:700;letter-spacing:-0.5px;margin-bottom:0.25rem;">Account <span class="gradient-text">Groups</span></h2>
+        <p style="color:var(--text-secondary);font-size:0.875rem;margin-bottom:1rem;">Group accounts together for one-click publishing to multiple platforms.</p>
+        <div id="groups-list" class="accounts-grid">
+          <div class="empty-state" style="grid-column:1/-1;">
+            <div class="empty-state-icon">📁</div>
+            <h3>Loading groups...</h3>
+            <div class="loading-pulse" style="text-align:center;color:var(--text-dim);font-size:0.875rem;">Loading account groups...</div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- Add Account Modal -->
+  <div id="add-account-modal" role="dialog" aria-modal="true" aria-labelledby="add-account-title" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
+    <div class="glass-card" style="width:440px;max-width:90vw;padding:1.5rem;position:relative;max-height:85vh;overflow-y:auto;">
+      <button id="add-account-modal-close" aria-label="Close modal" style="position:absolute;top:0.75rem;right:0.75rem;background:none;border:none;color:var(--text-dim);font-size:1.2rem;cursor:pointer;">✕</button>
+      <h3 id="add-account-title" style="margin-bottom:0.25rem;">Connect Account</h3>
+      <p class="text-dim text-sm" style="margin-bottom:1rem;">Add a social media account for publishing.</p>
+
+      <div class="form-group">
+        <label>Platform</label>
+        <select id="acct-platform" class="form-input">
+          <option value="">Select...</option>
+          <option value="youtube">YouTube</option>
+          <option value="tiktok">TikTok</option>
+          <option value="instagram">Instagram</option>
+          <option value="twitter">X / Twitter</option>
+          <option value="facebook">Facebook</option>
+          <option value="linkedin">LinkedIn</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Account Name</label>
+        <input type="text" id="acct-name" class="form-input" placeholder="@username or page name">
+      </div>
+
+      <div id="acct-token-fields">
+        <p class="text-dim text-sm mb-1">Manual tokens (optional — leave blank to use OAuth)</p>
+        <div class="form-group">
+          <label>Access Token</label>
+          <input type="password" id="acct-access-token" class="form-input" placeholder="Paste access token">
+        </div>
+        <div class="form-group">
+          <label>Refresh Token</label>
+          <input type="password" id="acct-refresh-token" class="form-input" placeholder="Paste refresh token">
+        </div>
+        <div id="acct-platform-fields"></div>
+      </div>
+
+      <div id="acct-error" class="text-sm" style="color:var(--red);margin-bottom:0.5rem;display:none;"></div>
+      <button class="btn btn-primary w-full" id="save-account-btn">Save Account</button>
+    </div>
+  </div>
+
+  <script src="i18n.js"></script>
+  <script src="api.js"></script>
+  <script defer src="particles.js"></script>
+  <script defer src="ui.js"></script>
+  <script nonce="__CSP_NONCE__">
+    function _t(k, f) { return (typeof __ === 'function' ? __(k, f) : f); }
+    const accountEscHtml = typeof escHtml === 'function' ? escHtml : (value) => String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
+    const accountFmtDate = typeof fmtDate === 'function' ? fmtDate : (value) => {
+      if (!value) return '—';
+      const date = new Date(value);
+      return isNaN(date.getTime()) ? '—' : date.toLocaleDateString();
+    };
+    const accountShowLoading = typeof showLoading === 'function' ? showLoading : (container, message = 'Loading...') => {
+      container.innerHTML = `<div class="loading-pulse" style="text-align:center;padding:2rem;color:var(--text-dim);font-size:0.875rem;">${accountEscHtml(message)}</div>`;
+    };
+    const accountShowEmpty = typeof showEmpty === 'function' ? showEmpty : (container, icon = '📋', title = 'Nothing here', message = '') => {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">${icon}</div>
+          <h3>${accountEscHtml(title)}</h3>
+          ${message ? `<p>${accountEscHtml(message)}</p>` : ''}
+        </div>`;
+    };
+    const accountShowError = typeof showError === 'function' ? showError : (container, message = 'Something went wrong') => {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon" style="color:var(--red)">⚠️</div>
+          <h3>Error</h3>
+          <p style="color:var(--red);font-size:0.85rem;">${accountEscHtml(message)}</p>
+        </div>`;
+    };
+
+    // Account CRUD
+    async function loadAccounts() {
+      const list = document.getElementById('accounts-list');
+      if (typeof isAuthenticated === 'function' && !isAuthenticated()) {
+        accountShowEmpty(list, '🔐', _t('common.sign-in', 'Sign In'), _t('accounts.sign-in-first', 'Sign in to manage your connected accounts.'));
+        return;
+      }
+      accountShowLoading(list, _t('accounts.loading', 'Loading accounts...'));
+      try {
+        const data = await listAccounts();
+        if (!data.accounts || data.accounts.length === 0) {
+          accountShowEmpty(list, '🔗', _t('accounts.no-accounts', 'No accounts yet'), _t('accounts.connect-first', 'Connect your first social media account.'));
+          return;
+        }
+        list.innerHTML = data.accounts.map(a => {
+          const hasTokens = a.has_oauth_refresh_token || a.has_instagram_access_token || a.has_tiktok_access_token || a.has_twitter_access_token || a.has_facebook_access_token || a.has_linkedin_access_token;
+          return `<div class="glass-card account-card">
+            <div class="flex justify-between items-center">
+              <h4>${accountEscHtml(a.account_name || _t('common.unnamed', 'Unnamed'))}</h4>
+              <span class="account-badge ${a.platform}">${platformIcon(a.platform)} ${accountEscHtml(a.platform)}</span>
+            </div>
+            <p class="text-xs mt-1">
+              <span class="health-status-dot ${hasTokens ? 'ok' : 'error'}"></span>
+              ${hasTokens ? _t('accounts.tokens-configured', '✅ Tokens configured') : _t('accounts.no-tokens', '⚠️ No tokens')}
+            </p>
+            <p class="text-xs text-dim">${accountEscHtml(a.notes) || ''}</p>
+            <p class="text-xs text-dim mt-1">${_t('accounts.added', 'Added')} ${a.created_at ? accountFmtDate(a.created_at) : _t('common.recently', 'Recently')}</p>
+            <div class="flex gap-1 mt-2">
+              ${a.has_oauth_refresh_token ? `<span class="tier-badge free">OAuth</span>` : ''}
+              ${a.has_instagram_access_token ? `<span class="tier-badge free">IG Token</span>` : ''}
+              ${a.has_tiktok_access_token ? `<span class="tier-badge free">TikTok Token</span>` : ''}
+              ${a.has_twitter_access_token ? `<span class="tier-badge free">X Token</span>` : ''}
+              ${a.has_facebook_access_token ? `<span class="tier-badge free">FB Token</span>` : ''}
+              ${a.has_linkedin_access_token ? `<span class="tier-badge free">LI Token</span>` : ''}
+            </div>
+            <div class="flex gap-1 mt-2">
+              <button class="btn btn-xs btn-ghost delete-account-btn" data-account-id="${accountEscHtml(a.id)}" style="color:var(--red);">🗑️ Delete</button>
+            </div>
+          </div>`;
+        }).join('');
+      } catch (err) {
+        console.error('Failed to load accounts:', err);
+        accountShowError(list, _t('accounts.failed-to-load', 'Failed to load accounts'));
+      }
+    }
+
+    async function loadGroups() {
+      const list = document.getElementById('groups-list');
+      if (typeof isAuthenticated === 'function' && !isAuthenticated()) {
+        accountShowEmpty(list, '🔐', _t('common.sign-in', 'Sign In'), _t('accounts.sign-in-first-groups', 'Sign in to view account groups.'));
+        return;
+      }
+      accountShowLoading(list, _t('accounts.loading-groups', 'Loading groups...'));
+      try {
+        const res = await fetch('/api/v1/account-groups', { headers: { 'Authorization': 'Bearer ' + getToken() } });
+        if (!res.ok) throw new Error('Failed to load account groups');
+        const data = await res.json();
+        if (!data.groups || data.groups.length === 0) {
+          accountShowEmpty(list, '📂', _t('accounts.no-groups', 'No groups yet'), _t('accounts.group-for-batch', 'Group accounts for batch publishing.'));
+          return;
+        }
+        list.innerHTML = data.groups.map(g => `<div class="glass-card account-card">
+          <h4>${accountEscHtml(g.name)}</h4>
+          <p class="text-xs text-dim mt-1">${g.accounts?.length || 0} accounts</p>
+        </div>`).join('');
+      } catch (err) {
+        console.error('Failed to load groups:', err);
+        accountShowError(list, _t('accounts.failed-to-load-groups', 'Failed to load groups'));
+      }
+    }
+
+    // Add Account Modal
+    function openAddAccountModal() {
+      document.getElementById('add-account-modal').style.display = 'flex';
+      document.getElementById('acct-platform').value = '';
+      document.getElementById('acct-name').value = '';
+      document.getElementById('acct-access-token').value = '';
+      document.getElementById('acct-refresh-token').value = '';
+      document.getElementById('acct-platform-fields').innerHTML = '';
+      document.getElementById('acct-error').style.display = 'none';
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).style.display = 'none';
+    }
+
+    function updateAcctFields() {
+      const platform = document.getElementById('acct-platform').value;
+      const fields = document.getElementById('acct-platform-fields');
+      const names = { youtube: _t('accounts.youtube-channel-id', 'YouTube Channel ID'), tiktok: _t('accounts.tiktok-open-id', 'TikTok Open ID'), instagram: _t('accounts.instagram-user-id', 'Instagram User ID'), twitter: _t('accounts.twitter-user-id', 'Twitter User ID'), facebook: _t('accounts.facebook-page-id', 'Facebook Page ID'), linkedin: _t('accounts.linkedin-person-id', 'LinkedIn Person ID') };
+      if (platform && names[platform]) {
+        fields.innerHTML = `<div class="form-group"><label>${names[platform]}</label><input type="text" id="acct-platform-id" class="form-input" placeholder="${_t('common.optional', 'Optional')}"></div>`;
+      } else {
+        fields.innerHTML = '';
+      }
+    }
+
+    async function addAccount() {
+      const btn = document.querySelector('#add-account-modal .btn-primary');
+      btn.disabled = true;
+      btn.textContent = _t('common.saving', 'Saving...');
+      const platform = document.getElementById('acct-platform').value;
+      const name = document.getElementById('acct-name').value.trim();
+      const accessToken = document.getElementById('acct-access-token').value;
+      const refreshToken = document.getElementById('acct-refresh-token').value;
+      const platformId = document.getElementById('acct-platform-id')?.value || '';
+      const errDiv = document.getElementById('acct-error');
+      errDiv.style.display = 'none';
+
+      if (!platform) { errDiv.textContent = _t('accounts.select-platform', 'Select a platform'); errDiv.style.display = ''; btn.disabled = false; btn.textContent = _t('accounts.save', 'Save Account'); return; }
+      if (!name) { errDiv.textContent = _t('accounts.enter-name', 'Enter an account name'); errDiv.style.display = ''; btn.disabled = false; btn.textContent = _t('accounts.save', 'Save Account'); return; }
+
+      const body = { platform, account_name: name, auth_mode: accessToken ? 'manual' : 'oauth', notes: '' };
+      if (refreshToken) body.oauth_refresh_token = refreshToken;
+
+      // Platform-specific fields
+      if (platform === 'youtube') { body.youtube_privacy_status = 'private'; }
+      if (platform === 'instagram') { body.instagram_access_token = accessToken; body.instagram_user_id = platformId; }
+      if (platform === 'tiktok') { body.tiktok_access_token = accessToken; body.tiktok_refresh_token = refreshToken; body.tiktok_open_id = platformId; }
+      if (platform === 'twitter') { body.twitter_access_token = accessToken; body.twitter_user_id = platformId; }
+      if (platform === 'facebook') { body.facebook_access_token = accessToken; body.facebook_page_id = platformId; }
+      if (platform === 'linkedin') { body.linkedin_access_token = accessToken; body.linkedin_user_id = platformId; }
+
+      try {
+        await apiJSON('/accounts', { method: 'POST', body });
+        showToast(_t('accounts.connected', 'Connected: {p} account added').replace('{p}', platform));
+        closeModal('add-account-modal');
+        loadAccounts();
+      } catch (err) {
+        errDiv.textContent = err.message;
+        errDiv.style.display = '';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = _t('accounts.save', 'Save Account');
+      }
+    }
+
+    async function deleteAccountById(id, btn) {
+      try {
+        await apiJSON(`/accounts/${id}`, { method: 'DELETE' });
+        showToast(_t('accounts.deleted', 'Deleted: Account removed'));
+        loadAccounts();
+      } catch (err) {
+        showToast(_t('common.error-prefix', 'Error') + ': ' + err.message);
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    // Helpers
+    // ── OAuth Connect via popup ──
+    function connectOAuth(platform) {
+      fetch(`/api/v1/oauth/${platform}/authorize`, {
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.url) {
+          const w = 600, h = 700;
+          const left = (screen.width - w) / 2, top = (screen.height - h) / 2;
+          window.open(data.url, 'oauth-popup',
+            `width=${w},height=${h},left=${left},top=${top},popup=1`);
+        } else {
+          showToast(_t('common.error-prefix', 'Error') + ': ' + (data.detail || _t('accounts.failed-oauth-url', 'Failed to get OAuth URL')));
+        }
+      })
+      .catch(err => showToast(_t('common.error-prefix', 'Error') + ': ' + err.message));
+    }
+
+    // Listen for OAuth callback messages from popup
+    const ALLOWED_ORIGINS = [window.location.origin];
+    window.addEventListener('message', function(event) {
+      if (!ALLOWED_ORIGINS.includes(event.origin)) return;
+      if (event.data && event.data.type === 'oauth-callback') {
+        if (event.data.status === 'success') {
+          showToast(_t('accounts.oauth-linked', 'Connected: {p} account linked!').replace('{p}', event.data.platform));
+          loadAccounts();
+        } else {
+          showToast(_t('accounts.oauth-failed', 'Error: {m}').replace('{m}', event.data.message || _t('accounts.oauth-default-fail', 'OAuth failed')));
+        }
+      }
+    });
+
+    function platformIcon(name) {
+      const icons = { youtube: '▶️', tiktok: '🎵', instagram: '📸', twitter: '🐦', facebook: '👍', linkedin: '💼' };
+      return icons[name] || '🌐';
+    }
+
+    // Event delegation for delete buttons (avoids XSS from inline onclick with string interpolation)
+    document.getElementById('accounts-list').addEventListener('click', async function(e) {
+      const btn = e.target.closest('.delete-account-btn');
+      if (btn) {
+        const id = btn.dataset.accountId;
+        if (id && window.confirm(_t('accounts.delete-confirm', 'Delete this account?'))) {
+          btn.disabled = true;
+          deleteAccountById(id, btn);
+        }
+      }
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+      if (typeof updateAuthUI === 'function') updateAuthUI();
+      loadAccounts();
+      loadGroups();
+
+      document.getElementById('add-account-btn')?.addEventListener('click', openAddAccountModal);
+      document.getElementById('add-account-modal-close')?.addEventListener('click', () => closeModal('add-account-modal'));
+      document.getElementById('acct-platform')?.addEventListener('change', updateAcctFields);
+      document.getElementById('save-account-btn')?.addEventListener('click', addAccount);
+
+      // OAuth card clicks
+      document.querySelectorAll('[data-oauth]').forEach(card => {
+        const platform = card.dataset.oauth;
+        card.addEventListener('click', () => connectOAuth(platform));
+        card.addEventListener('keydown', e => {
+          if (e.key === 'Enter') connectOAuth(platform);
+        });
+      });
+    });
+  </script>
+  <script defer src="choko-knowledge.js"></script>
+  <script defer src="choko.js"></script>
 </body>
 </html>
