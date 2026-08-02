@@ -94,6 +94,7 @@ For PostgreSQL, uncomment the `db` service in `docker-compose.yml` and set `DATA
 - [ ] Set `PUBLIC_BASE_URL` to your domain
 - [ ] Configure OAuth credentials for YouTube/Instagram/TikTok publishing
 - [ ] Run behind a reverse proxy (nginx/Caddy) with HTTPS
+- [ ] Run `make smoke` against the deployed app before promoting changes
 
 ## Pipeline
 
