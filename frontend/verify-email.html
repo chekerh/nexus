@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en" data-i18n>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>N</text></svg>">
+  <meta name="description" content="Verify your email address for Nexus-UGC to activate your account and start creating AI-powered viral videos.">
+  <meta property="og:title" content="Verify Email — Nexus-UGC">
+  <meta property="og:description" content="Verify your email address for Nexus-UGC to activate your account and start creating AI-powered viral videos.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <title>Verify Email — Nexus-UGC</title>
+  <link rel="stylesheet" href="style.css">
+  <meta name="theme-color" content="#0a0e17">
+  <meta name="robots" content="noindex">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-192.svg">
+</head>
+<body>
+  <a href="#main-content" class="skip-to-content" data-i18n="common.skip-to-content">Skip to content</a>
+  <noscript><div style="position:fixed;inset:0;z-index:9999;background:#05080f;color:#94a3b8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:2rem;text-align:center"><h1 style="color:#fff;font-size:1.5rem;margin:0">JavaScript Required</h1><p>Nexus-UGC requires JavaScript. Please enable it in your browser settings.</p></div></noscript>
+  <canvas id="particle-canvas"></canvas>
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <div class="brand-icon">N</div>
+      <a href="index.html"><span>Nexus<span class="gradient-text">UGC</span></span></a>
+    </div>
+    <div class="navbar-actions">
+      <button class="btn btn-ghost btn-sm" id="verify-signin-btn">Sign In</button>
+    </div>
+  </nav>
+  <main id="main-content"><div class="login-page">
+    <div class="glass-card login-card" style="max-width:420px;text-align:center;">
+      <h1 class="gradient-text" id="verify-status">Verifying...</h1>
+      <p id="verify-message" class="text-dim">Please wait while we verify your email.</p>
+    </div>
+  </div></main>
+  <script src="i18n.js"></script>
+  <script src="api.js"></script>
+  <script defer src="ui.js"></script>
+  <script >
+    (async function() {
+      const token = new URLSearchParams(window.location.search).get('token');
+      if (!token) {
+        document.getElementById('verify-status').textContent = '❌ Invalid Link';
+        document.getElementById('verify-message').textContent = 'No verification token found. Check your email for the correct link.';
+        return;
+      }
+      try {
+        const res = await apiJSON('/auth/verify-email', { method: 'POST', body: { token } });
+        document.getElementById('verify-status').textContent = '✅ Email Verified!';
+        document.getElementById('verify-message').innerHTML = `${res.email} is now verified. <a href="login.html" style="color:var(--cyan);">Sign in to continue.</a>`;
+      } catch (err) {
+        document.getElementById('verify-status').textContent = '❌ Verification Failed';
+        document.getElementById('verify-message').textContent = err.message || 'Token may be expired or invalid.';
+      }
+    })();
+    document.getElementById('verify-signin-btn')?.addEventListener('click', () => window.location.href = 'login.html');
+  </script>
+</body>
+</html>
