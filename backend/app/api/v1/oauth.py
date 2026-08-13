@@ -137,7 +137,11 @@ def youtube_callback(
         )
         token_data = resp.json()
         if "error" in token_data:
-            return _redirect_error(_("error.oauth-token-exchange-failed").format(detail=token_data.get('error_description', token_data['error'])))
+            return _redirect_error(
+                _("error.oauth-token-exchange-failed").format(
+                    detail=token_data.get("error_description", token_data["error"])
+                )
+            )
     except requests.RequestException as e:
         return _redirect_error(_("error.oauth-token-exchange-failed-detail").format(detail=e))
 
@@ -233,7 +237,11 @@ def tiktok_callback(
         )
         token_data = resp.json()
         if "error" in token_data:
-            return _redirect_error(_("error.oauth-token-exchange-failed").format(detail=token_data.get('error_description', token_data['error'])))
+            return _redirect_error(
+                _("error.oauth-token-exchange-failed").format(
+                    detail=token_data.get("error_description", token_data["error"])
+                )
+            )
     except requests.RequestException as e:
         return _redirect_error(_("error.oauth-token-exchange-failed-detail").format(detail=e))
 
@@ -329,7 +337,11 @@ def instagram_callback(
         )
         token_data = resp.json()
         if "error" in token_data:
-            return _redirect_error(_("error.oauth-token-exchange-failed").format(detail=token_data.get('error', {}).get('message', str(token_data))))
+            return _redirect_error(
+                _("error.oauth-token-exchange-failed").format(
+                    detail=token_data.get("error", {}).get("message", str(token_data))
+                )
+            )
     except requests.RequestException as e:
         return _redirect_error(_("error.oauth-token-exchange-failed-detail").format(detail=e))
 
@@ -441,7 +453,11 @@ def twitter_callback(
         )
         token_data = resp.json()
         if "error" in token_data:
-            return _redirect_error(_("error.oauth-token-exchange-failed").format(detail=token_data.get('error_description', token_data['error'])))
+            return _redirect_error(
+                _("error.oauth-token-exchange-failed").format(
+                    detail=token_data.get("error_description", token_data["error"])
+                )
+            )
     except requests.RequestException as e:
         return _redirect_error(_("error.oauth-token-exchange-failed-detail").format(detail=e))
 
@@ -534,7 +550,11 @@ def facebook_callback(
         )
         token_data = resp.json()
         if "error" in token_data:
-            return _redirect_error(_("error.oauth-token-exchange-failed").format(detail=token_data.get('error', {}).get('message', str(token_data))))
+            return _redirect_error(
+                _("error.oauth-token-exchange-failed").format(
+                    detail=token_data.get("error", {}).get("message", str(token_data))
+                )
+            )
     except requests.RequestException as e:
         return _redirect_error(_("error.oauth-token-exchange-failed-detail").format(detail=e))
 
@@ -633,7 +653,11 @@ def linkedin_callback(
         )
         token_data = resp.json()
         if "error" in token_data:
-            return _redirect_error(_("error.oauth-token-exchange-failed").format(detail=token_data.get('error_description', token_data['error'])))
+            return _redirect_error(
+                _("error.oauth-token-exchange-failed").format(
+                    detail=token_data.get("error_description", token_data["error"])
+                )
+            )
     except requests.RequestException as e:
         return _redirect_error(_("error.oauth-token-exchange-failed-detail").format(detail=e))
 

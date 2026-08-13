@@ -168,7 +168,11 @@ def register(payload: RegisterRequest, response: Response, db: Session = Depends
     _set_token_cookie(response, token)
 
     if verification_token:
-        verify_url = f"{settings.PUBLIC_BASE_URL}/verify-email.html?token={verification_token}" if settings.PUBLIC_BASE_URL else f"/api/v1/auth/verify-email?token={verification_token}"
+        verify_url = (
+            f"{settings.PUBLIC_BASE_URL}/verify-email.html?token={verification_token}"
+            if settings.PUBLIC_BASE_URL
+            else f"/api/v1/auth/verify-email?token={verification_token}"
+        )
         send_email(
             user.email,
             "Verify Your Email — Nexus-UGC",
@@ -184,9 +188,7 @@ def google_auth(payload: GoogleAuthRequest, response: Response, db: Session = De
         import google.auth.transport.requests
         from google.oauth2 import id_token
     except ImportError:
-        raise HTTPException(
-            status_code=500, detail=_("error.google-auth-missing")
-        ) from None
+        raise HTTPException(status_code=500, detail=_("error.google-auth-missing")) from None
 
     try:
         info = id_token.verify_oauth2_token(
@@ -323,7 +325,11 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
     user.reset_token = hashlib.sha256(token.encode()).hexdigest()
     user.reset_token_expires = datetime.now(UTC) + timedelta(hours=1)
     db.commit()
-    reset_url = f"{settings.PUBLIC_BASE_URL}/reset-password.html?token={token}" if settings.PUBLIC_BASE_URL else f"/reset-password.html?token={token}"
+    reset_url = (
+        f"{settings.PUBLIC_BASE_URL}/reset-password.html?token={token}"
+        if settings.PUBLIC_BASE_URL
+        else f"/reset-password.html?token={token}"
+    )
     send_email(
         user.email,
         "Reset Your Password — Nexus-UGC",
@@ -360,7 +366,11 @@ def send_verification(user: User = Depends(get_current_user), db: Session = Depe
     token = secrets.token_urlsafe(48)
     user.verification_token = hashlib.sha256(token.encode()).hexdigest()
     db.commit()
-    verify_url = f"{settings.PUBLIC_BASE_URL}/verify-email.html?token={token}" if settings.PUBLIC_BASE_URL else f"/api/v1/auth/verify-email?token={token}"
+    verify_url = (
+        f"{settings.PUBLIC_BASE_URL}/verify-email.html?token={token}"
+        if settings.PUBLIC_BASE_URL
+        else f"/api/v1/auth/verify-email?token={token}"
+    )
     send_email(
         user.email,
         "Verify Your Email — Nexus-UGC",
