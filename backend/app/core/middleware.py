@@ -37,8 +37,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
             csp = (
                 "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' https://accounts.google.com; "
-                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; "
+                "script-src 'self' https://accounts.google.com; "
+                "style-src 'self' https://fonts.googleapis.com https://accounts.google.com; "
                 "img-src 'self' data: blob:; "
                 "media-src 'self'; font-src 'self' data: https://fonts.gstatic.com; "
                 "connect-src 'self' https://accounts.google.com; "

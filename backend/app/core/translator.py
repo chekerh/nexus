@@ -1,9 +1,14 @@
 """Multi-language caption translation via Ollama."""
-import json
+
+import logging
 import re
+
 import ollama
-from typing import List, Optional
+
+logger = logging.getLogger(__name__)
+
 from .config import settings
+from .model_router import get_ollama_model_for_task
 
 LANGUAGES = {
     "en": "English",
@@ -28,10 +33,12 @@ LANGUAGES = {
     "id": "Indonesian",
 }
 
+
 def is_supported_language(code: str) -> bool:
     return code.lower() in LANGUAGES
 
-def translate_batch(texts: List[str], target_lang: str, source_lang: str = "en") -> Optional[List[str]]:
+
+def translate_batch(texts: list[str], target_lang: str, source_lang: str = "en") -> list[str] | None:
     if not texts:
         return []
     target = LANGUAGES.get(target_lang, "English")
@@ -48,8 +55,9 @@ def translate_batch(texts: List[str], target_lang: str, source_lang: str = "en")
     payload = "\n---\n".join(texts)
 
     try:
+        trans_model = get_ollama_model_for_task("translation")
         response = ollama.chat(
-            model=settings.OLLAMA_MODEL,
+            model=trans_model,
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": payload},
@@ -61,7 +69,7 @@ def translate_batch(texts: List[str], target_lang: str, source_lang: str = "en")
         if not content:
             return None
 
-        lines = [l.strip() for l in content.split("\n") if l.strip()]
+        lines = [ln.strip() for ln in content.split("\n") if ln.strip()]
         translated = []
         for i, line in enumerate(lines):
             if i < len(texts):
@@ -70,15 +78,16 @@ def translate_batch(texts: List[str], target_lang: str, source_lang: str = "en")
             return None
         return translated
     except Exception as e:
-        print(f"Translation failed: {e}")
+        logger.error(f"Translation failed: {e}")
         return None
 
-def translate_transcript(transcript: str, target_lang: str, source_lang: str = "en") -> Optional[str]:
+
+def translate_transcript(transcript: str, target_lang: str, source_lang: str = "en") -> str | None:
     if target_lang == source_lang:
         return transcript
 
     lines = transcript.strip().split("\n")
-    ts_pattern = re.compile(r'^(\[[^\]]+\]\s+)(.*)$')
+    ts_pattern = re.compile(r"^(\[[^\]]+\]\s+)(.*)$")
 
     texts = []
     original_lines = []

@@ -2,8 +2,7 @@ import json
 import os
 import threading
 import uuid
-from datetime import datetime, UTC
-from typing import Dict, List, Optional
+from datetime import UTC, datetime
 
 
 class AccountGroupStore:
@@ -16,25 +15,25 @@ class AccountGroupStore:
         if not os.path.exists(self.file_path):
             self._write_data([])
 
-    def _read_data(self) -> List[Dict]:
+    def _read_data(self) -> list[dict]:
         if not os.path.exists(self.file_path):
             return []
-        with open(self.file_path, "r", encoding="utf-8") as f:
+        with open(self.file_path, encoding="utf-8") as f:
             try:
                 data = json.load(f)
                 return data if isinstance(data, list) else []
             except Exception:
                 return []
 
-    def _write_data(self, data: List[Dict]) -> None:
+    def _write_data(self, data: list[dict]) -> None:
         with open(self.file_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
 
-    def list_groups(self) -> List[Dict]:
+    def list_groups(self) -> list[dict]:
         with self._lock:
             return self._read_data()
 
-    def get_group(self, group_id: str) -> Optional[Dict]:
+    def get_group(self, group_id: str) -> dict | None:
         with self._lock:
             data = self._read_data()
             for group in data:
@@ -42,7 +41,7 @@ class AccountGroupStore:
                     return group
             return None
 
-    def create_group(self, group: Dict) -> Dict:
+    def create_group(self, group: dict) -> dict:
         with self._lock:
             data = self._read_data()
             new_group = {
@@ -57,7 +56,7 @@ class AccountGroupStore:
             self._write_data(data)
             return new_group
 
-    def update_group(self, group_id: str, updates: Dict) -> Optional[Dict]:
+    def update_group(self, group_id: str, updates: dict) -> dict | None:
         with self._lock:
             data = self._read_data()
             for i, group in enumerate(data):
@@ -107,7 +106,7 @@ class AccountGroupStore:
                     return True
             return False
 
-    def get_groups_for_account(self, account_id: str) -> List[Dict]:
+    def get_groups_for_account(self, account_id: str) -> list[dict]:
         with self._lock:
             data = self._read_data()
             return [g for g in data if account_id in g.get("account_ids", [])]

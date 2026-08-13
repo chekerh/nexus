@@ -2,8 +2,8 @@ import json
 import os
 import threading
 import uuid
-from typing import Dict, List, Optional
-from .security import encrypt_token, decrypt_token, log_audit
+
+from .security import decrypt_token, encrypt_token, log_audit
 
 # Fields that should be encrypted
 ENCRYPTED_FIELDS = [
@@ -24,27 +24,27 @@ class AccountStore:
         if not os.path.exists(self.file_path):
             self._write_data([])
 
-    def _read_data(self) -> List[Dict]:
+    def _read_data(self) -> list[dict]:
         if not os.path.exists(self.file_path):
             return []
-        with open(self.file_path, "r", encoding="utf-8") as f:
+        with open(self.file_path, encoding="utf-8") as f:
             try:
                 data = json.load(f)
                 return data if isinstance(data, list) else []
             except Exception:
                 return []
 
-    def _write_data(self, data: List[Dict]) -> None:
+    def _write_data(self, data: list[dict]) -> None:
         with open(self.file_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
 
-    def list_accounts(self, platform: Optional[str] = None) -> List[Dict]:
+    def list_accounts(self, platform: str | None = None) -> list[dict]:
         with self._lock:
             data = self._read_data()
             accounts = [a for a in data if not platform or a.get("platform") == platform]
             return [self._decrypt_account_fields(a) for a in accounts]
 
-    def get_account(self, account_id: str) -> Optional[Dict]:
+    def get_account(self, account_id: str) -> dict | None:
         with self._lock:
             data = self._read_data()
             for account in data:
@@ -52,7 +52,7 @@ class AccountStore:
                     return self._decrypt_account_fields(account)
             return None
 
-    def _encrypt_account_fields(self, account: Dict) -> Dict:
+    def _encrypt_account_fields(self, account: dict) -> dict:
         """Encrypt sensitive fields in account data."""
         encrypted = dict(account)
         for field in ENCRYPTED_FIELDS:
@@ -60,7 +60,7 @@ class AccountStore:
                 encrypted[field] = encrypt_token(encrypted[field])
         return encrypted
 
-    def _decrypt_account_fields(self, account: Dict) -> Dict:
+    def _decrypt_account_fields(self, account: dict) -> dict:
         """Decrypt sensitive fields in account data."""
         decrypted = dict(account)
         for field in ENCRYPTED_FIELDS:
@@ -68,7 +68,7 @@ class AccountStore:
                 decrypted[field] = decrypt_token(decrypted[field])
         return decrypted
 
-    def create_account(self, account: Dict) -> Dict:
+    def create_account(self, account: dict) -> dict:
         with self._lock:
             data = self._read_data()
             new_account = {
@@ -91,11 +91,14 @@ class AccountStore:
             data.append(new_account)
             self._write_data(data)
             # Log the action (without sensitive data)
-            log_audit("account_created", {
-                "account_id": new_account["id"],
-                "platform": new_account["platform"],
-                "account_name": new_account["account_name"]
-            })
+            log_audit(
+                "account_created",
+                {
+                    "account_id": new_account["id"],
+                    "platform": new_account["platform"],
+                    "account_name": new_account["account_name"],
+                },
+            )
             return self._decrypt_account_fields(new_account)
 
     def delete_account(self, account_id: str) -> bool:
@@ -114,9 +117,12 @@ class AccountStore:
             self._write_data(new_data)
 
             # Log the action
-            log_audit("account_deleted", {
-                "account_id": account_id,
-                "platform": account.get("platform"),
-                "account_name": account.get("account_name")
-            })
+            log_audit(
+                "account_deleted",
+                {
+                    "account_id": account_id,
+                    "platform": account.get("platform"),
+                    "account_name": account.get("account_name"),
+                },
+            )
             return True
