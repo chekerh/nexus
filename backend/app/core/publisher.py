@@ -1,7 +1,7 @@
 import builtins
+import json
 import os
 import time
-import json
 from datetime import UTC, datetime
 from urllib.parse import quote
 
@@ -35,13 +35,24 @@ def _attach_result_url(result: dict) -> dict:
 
 def _build_auth_source(account: dict, platform: str) -> str:
     if platform == "youtube":
-        return "system" if not (account.get("oauth_refresh_token") or "").strip() and bool(settings.SYSTEM_YOUTUBE_REFRESH_TOKEN) else "account"
+        return (
+            "system"
+            if not (account.get("oauth_refresh_token") or "").strip() and bool(settings.SYSTEM_YOUTUBE_REFRESH_TOKEN)
+            else "account"
+        )
     if platform == "tiktok":
-        has_account_tokens = bool((account.get("tiktok_access_token") or "").strip() or (account.get("tiktok_refresh_token") or "").strip())
+        has_account_tokens = bool(
+            (account.get("tiktok_access_token") or "").strip() or (account.get("tiktok_refresh_token") or "").strip()
+        )
         has_system_tokens = bool(settings.SYSTEM_TIKTOK_ACCESS_TOKEN or settings.SYSTEM_TIKTOK_REFRESH_TOKEN)
         return "system" if not has_account_tokens and has_system_tokens else "account"
     if platform == "instagram":
-        return "system" if not (account.get("instagram_access_token") or "").strip() and bool(settings.SYSTEM_INSTAGRAM_ACCESS_TOKEN) else "account"
+        return (
+            "system"
+            if not (account.get("instagram_access_token") or "").strip()
+            and bool(settings.SYSTEM_INSTAGRAM_ACCESS_TOKEN)
+            else "account"
+        )
     return "account"
 
 
@@ -163,21 +174,23 @@ def publish_clip(platform: str, account: dict, video_path: str, title: str, desc
             )
             return _attach_result_url(tiktok_result)
 
-    return _attach_result_url({
-        "status": "manual_required",
-        "platform": platform,
-        "account_name": account_name,
-        "upload_url": MANUAL_UPLOAD_URL.get(platform),
-        "title": title,
-        "description": description,
-        "video_path": video_path,
-        "auth_source": "manual",
-        "message": (
-            "Official auto-publish needs platform app credentials and approval. "
-            "Open upload URL while logged into the selected account and upload this generated clip."
-        ),
-        "created_at": datetime.now(UTC).isoformat(),
-    })
+    return _attach_result_url(
+        {
+            "status": "manual_required",
+            "platform": platform,
+            "account_name": account_name,
+            "upload_url": MANUAL_UPLOAD_URL.get(platform),
+            "title": title,
+            "description": description,
+            "video_path": video_path,
+            "auth_source": "manual",
+            "message": (
+                "Official auto-publish needs platform app credentials and approval. "
+                "Open upload URL while logged into the selected account and upload this generated clip."
+            ),
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+    )
 
 
 def _dev_publish(platform: str, account: dict, video_path: str, title: str, description: str) -> dict:
@@ -193,7 +206,7 @@ def _dev_publish(platform: str, account: dict, video_path: str, title: str, desc
         "title": title,
         "description": description,
         "status": "published",
-        "mock_url": f"http://{(settings.PUBLIC_BASE_URL or 'localhost').lstrip('http://').lstrip('https://')}/mock/{int(time.time())}",
+        "mock_url": f"http://{(settings.PUBLIC_BASE_URL or 'localhost').replace('https://', '').replace('http://', '')}/mock/{int(time.time())}",
         "created_at": datetime.now(UTC).isoformat(),
     }
 
@@ -542,7 +555,7 @@ def _youtube_upload_video(access_token: str, video_path: str, title: str, descri
         "X-Upload-Content-Length": str(file_size),
     }
 
-    with httpx.Client(timeout=None) as client:
+    with httpx.Client(timeout=httpx.Timeout(300.0, connect=30.0)) as client:
         init_resp = client.post(init_url, headers=headers, json=metadata)
         if init_resp.status_code not in (200, 201):
             raise RuntimeError(f"Init upload failed ({init_resp.status_code}): {init_resp.text}")
