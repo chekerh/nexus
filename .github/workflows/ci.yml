@@ -23,9 +23,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install ruff bandit
       - name: Run ruff linter
-        run: ruff check backend/ tests/
+        run: ruff check backend/ tests/ alembic/
       - name: Run ruff formatter check
-        run: ruff format --check backend/ tests/
+        run: ruff format --check backend/ tests/ alembic/
       - name: Security lint (bandit, blocking on Medium+)
         run: bandit -r backend/ -c pyproject.toml -ll
 
@@ -83,6 +83,15 @@ jobs:
           ENCRYPTION_KEY: test-encryption-key-not-for-prod
           JWT_SECRET: test-jwt-secret-for-ci
           DATABASE_URL: sqlite:///tmp/test-nexus.db
+      - name: Alembic migration smoke
+        run: |
+          alembic upgrade head
+          alembic check
+        env:
+          SECRET_KEY: test-secret-key-not-for-production
+          ENCRYPTION_KEY: test-encryption-key-not-for-prod
+          JWT_SECRET: test-jwt-secret-for-ci
+          DATABASE_URL: sqlite:////tmp/ci-alembic.db
 
   frontend:
     name: Frontend (JS syntax + API reference integrity)

@@ -1,6 +1,7 @@
 """Alembic migrations environment configuration for Nexus-UGC."""
-from logging.config import fileConfig
+
 import os
+from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
 
@@ -17,21 +18,22 @@ if db_url:
     config.set_main_option("sqlalchemy.url", db_url)
 
 # Import all models so Alembic can detect them for autogenerate
-from backend.app.core.database import Base
-import backend.app.models.user          # noqa: F401
-import backend.app.models.persona       # noqa: F401
-import backend.app.models.api_key       # noqa: F401
-import backend.app.models.invite_key    # noqa: F401
-import backend.app.models.account       # noqa: F401
-import backend.app.models.job           # noqa: F401
-import backend.app.models.thumbnail     # noqa: F401
-import backend.app.models.whop          # noqa: F401
-import backend.app.models.campaign      # noqa: F401
-import backend.app.models.publish_history  # noqa: F401
-import backend.app.models.oauth_state      # noqa: F401
-import backend.app.models.rate_limit       # noqa: F401
+import backend.app.models.account  # noqa: F401
+import backend.app.models.api_key  # noqa: F401
+import backend.app.models.campaign  # noqa: F401
 import backend.app.models.feature_suggestion  # noqa: F401
-import backend.app.models.webhook_event    # noqa: F401
+import backend.app.models.invite_key  # noqa: F401
+import backend.app.models.job  # noqa: F401
+import backend.app.models.oauth_state  # noqa: F401
+import backend.app.models.persona  # noqa: F401
+import backend.app.models.publish_history  # noqa: F401
+import backend.app.models.rate_limit  # noqa: F401
+import backend.app.models.template  # noqa: F401
+import backend.app.models.thumbnail  # noqa: F401
+import backend.app.models.user  # noqa: F401
+import backend.app.models.webhook_event  # noqa: F401
+import backend.app.models.whop  # noqa: F401
+from backend.app.core.database import Base
 
 target_metadata = Base.metadata
 

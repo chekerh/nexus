@@ -11,6 +11,7 @@ from .oauth_state import OAuthState
 from .persona import Persona, Post, Schedule
 from .publish_history import PublishHistory
 from .rate_limit import RateLimitEntry
+from .template import Template
 from .thumbnail import Thumbnail
 from .user import SubscriptionTier, Tenant, User
 from .webhook_event import WebhookEvent
