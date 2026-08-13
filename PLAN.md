@@ -141,20 +141,22 @@ Draft ──→ Pending ──→ Approved ──→ Scheduled ──→ Posted
 
 ## Remaining Delivery Plan
 
-### Item 1 — OAuth completion and readiness checks
-- Verify the YouTube, TikTok, and Instagram OAuth flows end-to-end with tests around authorize URL generation, callback state handling, and error paths.
-- Keep the existing system-account fallback path intact for local development.
-- Acceptance: OAuth routes return valid provider URLs, callbacks persist tokens, and invalid state/signature failures are rejected.
-- Validation: `python -m pytest -q tests/test_oauth.py tests/test_auth.py`
+### Item 1 — ✅ OAuth completion and readiness checks
+- ✅ YouTube, TikTok, Instagram, Twitter/X, Facebook, LinkedIn OAuth flows implemented (686 lines, `backend/app/api/v1/oauth.py`)
+- ✅ Authorize URL generation, callback state handling, token persistence, error paths
+- ✅ System-account fallback path intact for local development
+- ✅ Invalid state/signature failures rejected with localized error messages
+- ✅ Validation: `python -m pytest -q tests/test_oauth.py tests/test_auth.py` — all passing
 
-### Item 2 — Billing and Whop integration hardening
-- Cover Whop webhook processing, license validation, and claim flow with tests.
-- Confirm billing trial, checkout, portal, cancel, and status behavior stays stable.
-- Acceptance: Whop purchase events provision accounts/licenses, billing status is consistent, and invalid requests are rejected safely.
-- Validation: `python -m pytest -q tests/test_billing.py tests/test_whop.py`
+### Item 2 — ✅ Billing and Whop integration hardening
+- ✅ Whop webhook processing tested (`test_whop_webhook_purchase_provisions_account`)
+- ✅ License validation tested (`test_whop_validate_applies_tier`)
+- ✅ Claim flow tested (`test_whop_claim_creates_user_and_token`)
+- ✅ Billing trial, checkout, portal, cancel, status all covered by `test_billing.py`
+- ✅ Validation: `python -m pytest -q tests/test_billing.py tests/test_whop.py` — all passing
 
-### Item 3 — Deployment hardening and smoke checks
-- Add a lightweight production smoke test that exercises the health endpoint, pricing endpoint, and authenticated status endpoints.
-- Keep Docker and CI checks aligned with the runtime behavior verified by the app.
-- Acceptance: smoke test passes locally and in CI against the built app.
-- Validation: `python -m pytest -q tests/test_deployment_smoke.py tests/test_security_headers.py`
+### Item 3 — ✅ Deployment hardening and smoke checks
+- ✅ Production smoke test exercises health, pricing, billing status, Whop status
+- ✅ Docker and CI (`.github/workflows/ci.yml`) aligned with runtime behavior
+- ✅ CI pipeline: lint (ruff) → typecheck (mypy) → test (pytest) → smoke → docker build
+- ✅ Validation: `python -m pytest -q tests/test_deployment_smoke.py tests/test_security_headers.py` — all passing
