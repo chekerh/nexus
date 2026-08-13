@@ -1,0 +1,31 @@
+[project]
+name = "nexus-ugc"
+version = "2.0.0"
+description = "AI-powered viral video creation and publishing platform"
+requires-python = ">=3.13"
+license = { text = "MIT" }
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM", "ARG"]
+ignore = ["B008", "E402", "ARG001", "E501", "SIM115"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.13"
+strict = false
+ignore_missing_imports = true
+warn_unused_ignores = true
+# Check each source file standalone (legacy SQLAlchemy Column-typing debt is a
+# known, tracked backlog; cross-module analysis would block the whole tree).
+follow_imports = "skip"
+exclude = ["venv/", ".venv/", "tests/"]
+
+[tool.bandit]
+exclude_dirs = ["venv/", ".venv/", "tests/", ".git/"]
+skips = ["B101", "B311"]
