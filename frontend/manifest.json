@@ -1,0 +1,59 @@
+{
+  "name": "Nexus-UGC",
+  "short_name": "Nexus",
+  "description": "AI-powered viral video engine. Turn long-form videos into viral shorts with local AI.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#05080f",
+  "theme_color": "#0a0e17",
+  "orientation": "any",
+  "categories": ["productivity", "social", "video"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Create",
+      "short_name": "Create",
+      "description": "Create new brain rot shorts",
+      "url": "/brainrot.html"
+    },
+    {
+      "name": "Queue",
+      "short_name": "Queue",
+      "description": "View publishing queue",
+      "url": "/queue.html"
+    },
+    {
+      "name": "Billing",
+      "short_name": "Billing",
+      "description": "Manage subscription",
+      "url": "/billing.html"
+    }
+  ],
+  "screenshots": [],
+  "prefer_related_applications": false
+}
