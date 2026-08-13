@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en" data-i18n>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>N</text></svg>">
+  <meta name="description" content="Manage your Nexus-UGC subscription and billing. Upgrade to Pro or Enterprise for more credits and features.">
+  <meta property="og:title" content="Billing — Nexus-UGC">
+  <meta property="og:description" content="Manage your Nexus-UGC subscription and billing. Upgrade to Pro or Enterprise for more credits and features.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <title>Billing — Nexus-UGC</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="choko.css">
+  <meta name="theme-color" content="#0a0e17">
+  <meta name="robots" content="noindex">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-192.svg">
+</head>
+<body>
+  <a href="#main-content" class="skip-to-content" data-i18n="common.skip-to-content">Skip to content</a>
+  <noscript><div style="position:fixed;inset:0;z-index:9999;background:#05080f;color:#94a3b8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:2rem;text-align:center"><h1 style="color:#fff;font-size:1.5rem;margin:0">JavaScript Required</h1><p>Nexus-UGC requires JavaScript. Please enable it in your browser settings.</p></div></noscript>
+  <canvas id="particle-canvas"></canvas>
+
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <div class="brand-icon">N</div>
+      <a href="index.html"><span>Nexus<span class="gradient-text">UGC</span></span></a>
+    </div>
+    <button class="mobile-nav-toggle" aria-label="Toggle navigation">☰</button>
+    <div class="navbar-actions">
+      <span class="user-email" id="user-email"></span>
+      <button class="btn btn-ghost btn-sm" id="login-btn" data-i18n="common.sign-in">Sign In</button>
+      <button class="btn btn-ghost btn-sm hidden" id="logout-btn" data-i18n="common.logout">Logout</button>
+    </div>
+  </nav>
+
+  <div class="app-layout">
+    <aside class="sidebar">
+      <nav class="sidebar-nav">
+        <a href="index.html">📊 <span class="nav-label" data-i18n="nav.dashboard">Dashboard</span></a>
+        <a href="brainrot.html">🧠 <span class="nav-label" data-i18n="nav.brainrot">Brain Rot</span></a>
+        <a href="queue.html">📋 <span class="nav-label" data-i18n="nav.queue">Post Queue</span></a>
+        <a href="templates.html">📋 <span class="nav-label" data-i18n="nav.templates">Templates</span></a>
+        <a href="calendar.html">📅 <span class="nav-label" data-i18n="nav.calendar">Calendar</span></a>
+        <a href="personas.html">👤 <span class="nav-label" data-i18n="nav.personas">Personas</span></a>
+        <a href="campaigns.html">🎯 <span class="nav-label" data-i18n="nav.campaigns">Campaigns</span></a>
+        <div class="sidebar-divider"></div>
+        <a href="accounts.html">🔗 <span class="nav-label" data-i18n="nav.accounts">Accounts</span></a>
+        <a href="setup.html">⚙️ <span class="nav-label" data-i18n="nav.setup">Setup</span></a>
+        <div class="sidebar-divider"></div>
+        <a href="#" class="active">💳 <span class="nav-label" data-i18n="nav.billing">Billing</span></a>
+        <a href="settings.html">⚙️ <span class="nav-label" data-i18n="nav.settings">Settings</span></a>
+        <a href="admin-login.html">🔐 <span class="nav-label" data-i18n="nav.admin">Admin</span></a>
+      </nav>
+    </aside>
+
+    <main class="main-area" id="main-content">
+      <div class="page-header">
+        <div>
+          <h1 data-i18n="billing.page-title">Billing & <span class="gradient-text">License</span></h1>
+          <p data-i18n="billing.page-subtitle">Manage your subscription and view usage.</p>
+        </div>
+      </div>
+
+      <div class="stats-grid" id="current-plan-section" style="grid-template-columns:1fr;">
+        <div class="stat-card" style="text-align:center;">
+          <div id="current-plan-content" class="loading-pulse" style="color:var(--text-dim);font-size:0.875rem">Loading plan...</div>
+          <div id="plan-actions" style="margin-top:1rem;display:none;">
+            <button class="btn btn-outline btn-sm" id="portal-btn">Manage in Stripe</button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--red);" id="cancel-btn">Cancel Subscription</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:1rem;margin:1.5rem 0 1rem;">
+        <h2 style="font-size:1.35rem;font-weight:700;letter-spacing:-0.5px;margin:0;">Available <span class="gradient-text">Plans</span></h2>
+        <div style="display:flex;align-items:center;gap:0.5rem;background:var(--glass-bg);border-radius:var(--radius-sm);padding:2px;border:1px solid var(--glass-border);">
+          <button class="btn btn-xs" id="billing-toggle-monthly" style="background:linear-gradient(135deg,var(--cyan),var(--purple));color:#fff;border:none;padding:0.25rem 0.75rem;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;">Monthly</button>
+          <button class="btn btn-xs" id="billing-toggle-annual" style="background:transparent;color:var(--text-secondary);border:none;padding:0.25rem 0.75rem;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;">Annual <span style="color:var(--green);font-size:0.65rem;">Save 20%</span></button>
+        </div>
+      </div>
+      <div class="stats-grid" id="pricing-grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));"></div>
+
+      <div class="content-card">
+        <h3 style="margin:0 0 0.5rem;font-size:0.9rem;">🔑 Claim License Key</h3>
+        <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:0.75rem;">Have a Whop purchase code? Enter it here to activate your subscription.</p>
+        <div class="flex gap-1" style="max-width:400px;">
+          <input type="text" id="license-key-input" class="form-input" placeholder="NEXUS-XXXX-XXXX" style="flex:1;font-family:monospace;">
+          <button class="btn btn-primary" id="claim-license-btn">Activate</button>
+        </div>
+        <div id="license-error" class="text-sm" style="color:var(--red);margin-top:0.5rem;display:none;"></div>
+        <div id="license-success" class="text-sm" style="color:var(--green);margin-top:0.5rem;display:none;"></div>
+      </div>
+
+      <div class="content-card">
+        <h3 style="margin:0 0 0.75rem;font-size:0.9rem;">📊 Monthly Usage</h3>
+        <div id="usage-content" class="loading-pulse" style="color:var(--text-dim);font-size:0.875rem">Loading usage...</div>
+      </div>
+
+      <div class="content-card" id="invoice-section" style="display:none;">
+        <h3 style="margin:0 0 0.75rem;font-size:0.9rem;">📄 Invoice History</h3>
+        <div id="invoice-list" class="text-dim text-sm">Loading invoices...</div>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <script src="i18n.js"></script>
+  <script src="api.js"></script>
+  <script defer src="particles.js"></script>
+  <script defer src="ui.js"></script>
+  <script >
+    function _t(k, f) { return (typeof __ === 'function' ? __(k, f) : f); }
+    let _billingPeriod = 'monthly';
+
+    function setBillingPeriod(period) {
+      _billingPeriod = period;
+      document.getElementById('billing-toggle-monthly').style.background = period === 'monthly' ? 'linear-gradient(135deg,var(--cyan),var(--purple))' : 'transparent';
+      document.getElementById('billing-toggle-monthly').style.color = period === 'monthly' ? '#fff' : 'var(--text-secondary)';
+      document.getElementById('billing-toggle-annual').style.background = period === 'annual' ? 'linear-gradient(135deg,var(--cyan),var(--purple))' : 'transparent';
+      document.getElementById('billing-toggle-annual').style.color = period === 'annual' ? '#fff' : 'var(--text-secondary)';
+      renderPricing();
+    }
+
+    let _pricingCache = null;
+    let _meCache = null;
+    let _statusCache = null;
+
+    async function loadBilling() {
+      updateAuthUI();
+      document.getElementById('pricing-grid').innerHTML = '<div class="loading-pulse" style="grid-column:1/-1;padding:2rem;text-align:center;color:var(--text-dim);font-size:0.875rem">' + _t('billing.loading-plan', 'Loading plan...') + '</div>';
+      try {
+        const [status, pricing, me] = await Promise.all([
+          apiJSON('/whop/status').catch(() => ({ has_license: false })),
+          apiJSON('/pricing'),
+          getMe(),
+        ]);
+        _pricingCache = pricing;
+        _meCache = me;
+        _statusCache = status;
+
+        const planColors = { free: 'var(--text-secondary)', pro: 'var(--cyan)', enterprise: 'var(--purple)' };
+        const tier = me.tier || 'free';
+        document.getElementById('current-plan-content').innerHTML = `
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;text-align:left;">
+            <div style="flex:1;">
+              <div style="font-size:1.5rem;font-weight:800;color:${planColors[tier] || 'inherit'};text-transform:capitalize;letter-spacing:-0.5px;">${_t('billing.current-plan', tier + ' Plan')}</div>
+              <div class="text-secondary text-sm" style="margin-top:0.25rem;">${me.credits_used || 0} ${_t('billing.credits-of', 'of')} ${me.credits_limit || 5} ${_t('billing.credits-used', 'credits used this month')}</div>
+              ${status.has_license ? '<div class="text-sm" style="color:var(--green);">' + _t('billing.license-label', 'License:') + ' ' + (status.license_key || 'active') + '</div>' : ''}
+              ${me.trial_active ? '<div class="text-sm" style="color:var(--amber);">' + _t('billing.trial-ends', 'Trial ends') + ' ' + new Date(me.trial_ends_at).toLocaleDateString() + '</div>' : ''}
+            </div>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+              ${tier !== 'free' && me.stripe_customer_id ? '<button class="btn btn-outline btn-sm manage-portal-btn">' + _t('billing.manage-billing', 'Manage Billing') + '</button>' : ''}
+              ${tier !== 'free' && me.stripe_customer_id ? '<button class="btn btn-ghost btn-sm cancel-plan-btn" style="color:var(--red);">' + _t('common.delete', 'Cancel') + '</button>' : ''}
+            </div>
+          </div>
+        `;
+
+        renderPricing();
+
+        const used = me.credits_used || 0;
+        const limit = me.credits_limit || 5;
+        const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+        document.getElementById('usage-content').innerHTML = `
+          <div style="max-width:400px;">
+            <div class="flex justify-between text-sm mb-1">
+              <span>${used} ${_t('billing.credits-of', 'of')} ${limit} ${_t('billing.credits-used', 'credits used')}</span>
+              <span style="font-weight:600;">${pct}%</span>
+            </div>
+            <div style="height:8px;background:rgba(148,163,184,0.1);border-radius:4px;overflow:hidden;">
+              <div style="height:100%;width:${pct}%;background:${pct > 80 ? 'var(--red)' : pct > 50 ? 'var(--yellow)' : 'var(--green)'};border-radius:4px;transition:width 0.5s;"></div>
+            </div>
+            ${pct >= 100 ? '<div style="color:var(--red);font-size:0.85rem;margin-top:0.5rem;">' + _t('billing.upgrade-prompt', 'You\'ve used all credits.') + ' <a href="billing.html" style="color:var(--cyan);">' + _t('billing.upgrade-link', 'Upgrade to continue.') + '</a></div>' : ''}
+          </div>
+        `;
+
+        loadInvoices();
+      } catch (err) {
+        document.getElementById('current-plan-content').innerHTML = '<p class="text-dim">' + _t('common.failed-to-load', 'Failed to load:') + ' ' + escHtml(err.message) + '</p>';
+      }
+    }
+
+    function renderPricing() {
+      const tier = _meCache?.tier || 'free';
+      const planColors = { free: 'var(--text-secondary)', pro: 'var(--cyan)', enterprise: 'var(--purple)' };
+      const annualMultiplier = _billingPeriod === 'annual' ? 0.8 : 1.0;
+      const plans = _pricingCache ? Object.entries(_pricingCache) : [];
+      document.getElementById('pricing-grid').innerHTML = plans.map(([key, p]) => {
+        const price = p.price > 0 ? '$' + Math.round(p.price * annualMultiplier) : _t('plan-free-name', 'Free');
+        const periodLabel = _billingPeriod === 'annual' && p.price > 0 ? '<span style="font-size:0.65rem;color:var(--green);">' + _t('billing.per-month-yearly', '/mo billed yearly') + '</span>' : p.price > 0 ? '<span style="font-size:0.75rem;color:var(--text-secondary);">' + _t('billing.per-month', '/mo') + '</span>' : '';
+        return `
+          <div class="stat-card" style="text-align:center;${tier === key ? 'border:2px solid ' + planColors[key] : ''}">
+            <div style="font-size:1.75rem;margin-bottom:0.25rem;">${key === 'free' ? '🆓' : key === 'pro' ? '🚀' : '💎'}</div>
+            <div class="stat-card-label" style="font-size:1rem;">${p.label}</div>
+            <div class="stat-card-value" style="margin:0.25rem 0;font-size:1.75rem;">${price} ${periodLabel}</div>
+            <div class="text-secondary text-sm">${p.credits} ${_t('billing.credits-per-month', 'credits/mo')}</div>
+            ${tier === key ? '<div class="tier-badge pro" style="margin-top:0.75rem;">' + _t('billing.current-badge', 'Current') + '</div>' : ''}
+            ${tier !== key && key !== 'free' ? '<button class="btn btn-sm btn-primary mt-2 upgrade-btn" data-tier="' + key + '" style="margin-top:0.75rem;">' + _t('billing.upgrade-link', 'Upgrade') + '</button>' : ''}
+          </div>`;
+      }).join('');
+    }
+
+    async function loadInvoices() {
+      const invSection = document.getElementById('invoice-section');
+      const invList = document.getElementById('invoice-list');
+      if (!_meCache?.stripe_customer_id) { invSection.style.display = 'none'; return; }
+      invSection.style.display = '';
+      invList.innerHTML = _t('billing.loading-invoices', 'Loading invoices...');
+      try {
+        const data = await apiJSON('/billing/invoices');
+        const invoices = data.invoices || [];
+        if (invoices.length === 0) {
+          invList.innerHTML = '<span class="text-dim text-sm">' + _t('billing.no-invoices', 'No invoices yet.') + '</span>';
+          return;
+        }
+        invList.innerHTML = invoices.map(inv => `
+          <div class="flex justify-between items-center text-sm" style="padding:0.5rem 0;border-bottom:1px solid rgba(148,163,184,0.06);">
+            <span>${new Date(inv.created * 1000).toLocaleDateString()}</span>
+            <span>$${(inv.amount_paid / 100).toFixed(2)}</span>
+            <span class="tier-badge ${inv.status}">${inv.status}</span>
+            ${inv.hosted_invoice_url ? '<a href="' + inv.hosted_invoice_url + '" target="_blank" style="color:var(--cyan);font-size:0.8rem;">' + _t('common.search', 'View') + '</a>' : ''}
+          </div>
+        `).join('');
+      } catch (e) {
+        invList.innerHTML = '<span class="text-dim text-sm">' + _t('common.failed-to-load', 'Failed to load.') + '</span>';
+      }
+    }
+
+    async function upgrade(btn, tier) {
+      btn.disabled = true;
+      btn.textContent = _t('common.loading', 'Redirecting...');
+      try {
+        const result = await apiJSON('/billing/checkout', {
+          method: 'POST',
+          body: { tier },
+        });
+        if (result.url) {
+          if (result.url.startsWith('http')) {
+            window.location.href = result.url;
+          } else {
+            showToast('Dev Mode', 'Checkout simulated: ' + result.url);
+            loadBilling();
+          }
+        }
+      } catch (err) {
+        showToast(_t('common.error', 'Error'), err.message);
+        btn.disabled = false;
+        btn.textContent = _t('billing.upgrade-link', 'Upgrade');
+      }
+    }
+
+    async function managePortal() {
+      const result = await apiJSON('/billing/portal', { method: 'POST' });
+      if (result.url) {
+        window.location.href = result.url;
+      }
+    }
+
+    async function cancelPlan() {
+      if (!await confirmDialog(_t('billing.cancel-confirm', 'Are you sure you want to cancel your subscription? You will be downgraded to Free at the end of the billing period.'))) return;
+      const result = await apiJSON('/billing/cancel', { method: 'POST' });
+      showToast(_t('common.success', 'Cancelled'), result.message || 'Subscription cancelled');
+      loadBilling();
+    }
+
+    async function claimLicense() {
+      const btn = document.getElementById('claim-license-btn');
+      btn.disabled = true;
+      btn.textContent = _t('billing.activating', 'Activating...');
+      const key = document.getElementById('license-key-input').value.trim();
+      const errDiv = document.getElementById('license-error');
+      const sucDiv = document.getElementById('license-success');
+      errDiv.style.display = 'none';
+      sucDiv.style.display = 'none';
+
+      if (!key) { errDiv.textContent = _t('billing.enter-key-error', 'Enter a license key'); errDiv.style.display = ''; btn.disabled = false; btn.textContent = _t('billing.activate', 'Activate License'); return; }
+
+      try {
+        const res = await apiJSON('/whop/claim', { method: 'POST', body: { license_key: key } });
+        sucDiv.innerHTML = '✅ ' + (escHtml(res.message) || _t('billing.license-activated', 'License activated! Your account has been upgraded.'));
+        sucDiv.style.display = '';
+        document.getElementById('license-key-input').value = '';
+        loadBilling();
+      } catch (err) {
+        errDiv.textContent = err.message;
+        errDiv.style.display = '';
+        btn.disabled = false;
+        btn.textContent = _t('billing.activate', 'Activate');
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadBilling();
+      document.getElementById('billing-toggle-monthly')?.addEventListener('click', () => setBillingPeriod('monthly'));
+      document.getElementById('billing-toggle-annual')?.addEventListener('click', () => setBillingPeriod('annual'));
+      document.getElementById('claim-license-btn')?.addEventListener('click', claimLicense);
+
+      // Event delegation for dynamically inserted buttons
+      document.getElementById('current-plan-content')?.addEventListener('click', async e => {
+        const btn = e.target.closest('.manage-portal-btn, .cancel-plan-btn');
+        if (!btn) return;
+        btn.disabled = true;
+        const orig = btn.textContent;
+        try {
+          if (btn.classList.contains('manage-portal-btn')) await managePortal();
+          if (btn.classList.contains('cancel-plan-btn')) await cancelPlan();
+        } finally {
+          btn.disabled = false;
+          btn.textContent = orig;
+        }
+      });
+      document.getElementById('pricing-grid')?.addEventListener('click', e => {
+        const btn = e.target.closest('.upgrade-btn');
+        if (btn) upgrade(btn, btn.dataset.tier);
+      });
+    });
+  </script>
+  <script defer src="choko-knowledge.js"></script>
+  <script defer src="choko.js"></script>
+</body>
+</html>

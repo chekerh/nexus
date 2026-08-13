@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en" data-i18n>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>N</text></svg>">
+  <meta name="description" content="Manage AI content personas for automated video generation. Define tone, style, and platform preferences.">
+  <meta property="og:title" content="Personas — Nexus-UGC">
+  <meta property="og:description" content="Manage AI content personas for automated video generation. Define tone, style, and platform preferences.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <title>Personas — Nexus-UGC</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="choko.css">
+  <meta name="theme-color" content="#0a0e17">
+  <meta name="robots" content="noindex">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-192.svg">
+</head>
+<body>
+  <a href="#main-content" class="skip-to-content" data-i18n="common.skip-to-content">Skip to content</a>
+  <noscript><div style="position:fixed;inset:0;z-index:9999;background:#05080f;color:#94a3b8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:2rem;text-align:center"><h1 style="color:#fff;font-size:1.5rem;margin:0">JavaScript Required</h1><p>Nexus-UGC requires JavaScript. Please enable it in your browser settings.</p></div></noscript>
+  <canvas id="particle-canvas"></canvas>
+
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <div class="brand-icon">N</div>
+      <a href="index.html"><span>Nexus<span class="gradient-text">UGC</span></span></a>
+    </div>
+    <button class="mobile-nav-toggle" aria-label="Toggle navigation">☰</button>
+    <div class="navbar-actions">
+      <span class="user-email" id="user-email"></span>
+      <button class="btn btn-ghost btn-sm" id="login-btn" data-i18n="common.sign-in">Sign In</button>
+      <button class="btn btn-ghost btn-sm hidden" id="logout-btn" data-i18n="common.logout">Logout</button>
+    </div>
+  </nav>
+
+  <div class="app-layout">
+    <aside class="sidebar">
+      <nav class="sidebar-nav">
+        <a href="index.html">📊 <span class="nav-label" data-i18n="nav.dashboard">Dashboard</span></a>
+        <a href="brainrot.html">🧠 <span class="nav-label" data-i18n="nav.brainrot">Brain Rot</span></a>
+        <a href="queue.html">📋 <span class="nav-label" data-i18n="nav.queue">Post Queue</span></a>
+        <a href="templates.html">📋 <span class="nav-label" data-i18n="nav.templates">Templates</span></a>
+        <a href="calendar.html">📅 <span class="nav-label" data-i18n="nav.calendar">Calendar</span></a>
+        <a href="#" class="active">👤 <span class="nav-label" data-i18n="nav.personas">Personas</span></a>
+        <a href="campaigns.html">🎯 <span class="nav-label" data-i18n="nav.campaigns">Campaigns</span></a>
+        <div class="sidebar-divider"></div>
+        <a href="accounts.html">🔗 <span class="nav-label" data-i18n="nav.accounts">Accounts</span></a>
+        <a href="setup.html">⚙️ <span class="nav-label" data-i18n="nav.setup">Setup</span></a>
+        <div class="sidebar-divider"></div>
+        <a href="billing.html">💳 <span class="nav-label" data-i18n="nav.billing">Billing</span></a>
+        <a href="settings.html">⚙️ <span class="nav-label" data-i18n="nav.settings">Settings</span></a>
+        <a href="admin-login.html">🔐 <span class="nav-label" data-i18n="nav.admin">Admin</span></a>
+      </nav>
+    </aside>
+    <main class="main-area" id="main-content" style="padding:2rem">
+      <div class="section" style="padding-top:0">
+        <div class="page-header">
+          <div>
+            <h1>Personas</h1>
+            <p>Brand identities that speak with one voice across every platform</p>
+          </div>
+          <button id="create-persona-btn" class="btn btn-primary">+ New Persona</button>
+        </div>
+
+        <div id="personas-grid" class="features-grid">
+          <div class="loading-pulse" style="grid-column:1/-1;padding:3rem;text-align:center;color:var(--text-dim)">Loading personas...</div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ====== Persona Drawer (create/edit) ====== -->
+  <div id="persona-drawer" class="drawer-overlay" style="display:none">
+    <div class="drawer">
+      <div class="drawer-header">
+        <h3 id="drawer-title">Create Persona</h3>
+        <button class="btn btn-sm btn-ghost drawer-close">&times;</button>
+      </div>
+      <div class="drawer-body">
+        <div class="form-group">
+          <label>Name</label>
+          <input id="pf-name" class="form-input" placeholder="e.g. TechTitan">
+        </div>
+        <div class="form-group">
+          <label>Bio</label>
+          <textarea id="pf-bio" class="form-input" rows="2" placeholder="Short bio for this persona"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Voice Description</label>
+          <textarea id="pf-voice" class="form-input" rows="2" placeholder="e.g. Bold, data-driven, confident but approachable"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Target Audience</label>
+          <input id="pf-audience" class="form-input" placeholder="e.g. SaaS founders, 25-40">
+        </div>
+        <div class="form-group">
+          <label>Tone</label>
+          <select id="pf-tone" class="form-input">
+            <option value="professional">Professional</option>
+            <option value="casual">Casual</option>
+            <option value="humorous">Humorous</option>
+            <option value="inspirational">Inspirational</option>
+            <option value="educational">Educational</option>
+            <option value="controversial">Controversial</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="pf-auto-approve">
+            Auto-approve generated content (skip manual approval)
+          </label>
+        </div>
+        <div class="form-group">
+          <label>Content Pillars (one per line)</label>
+          <textarea id="pf-pillars" class="form-input" rows="3" placeholder="AI tutorials&#10;Product reviews&#10;Industry trends"></textarea>
+        </div>
+      </div>
+      <div class="drawer-footer">
+        <button class="btn btn-ghost drawer-close">Cancel</button>
+        <button id="save-persona-btn" class="btn btn-primary">Save Persona</button>
+      </div>
+      <input type="hidden" id="pf-id" value="">
+    </div>
+  </div>
+
+  <!-- ====== Repurpose Drawer ====== -->
+  <div id="repurpose-drawer" class="drawer-overlay" style="display:none">
+    <div class="drawer">
+      <div class="drawer-header">
+        <h3 id="repurpose-drawer-title">Repurpose Content</h3>
+        <button class="btn btn-sm btn-ghost drawer-close">&times;</button>
+      </div>
+      <div class="drawer-body">
+        <div class="form-group">
+          <label>Paste Transcript</label>
+          <textarea id="repurpose-transcript" class="form-input" rows="6" placeholder="Paste your video transcript here. AI will generate platform-specific posts for Twitter, LinkedIn, Instagram, and Facebook..."></textarea>
+        </div>
+        <button id="repurpose-generate-btn" class="btn btn-primary w-full">Generate</button>
+        <div id="repurpose-results" style="display:none;margin-top:1rem"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container" aria-live="polite"></div>
+  <script src="i18n.js"></script>
+  <script src="api.js"></script>
+  <script defer src="particles.js"></script>
+  <script defer src="ui.js"></script>
+  <script defer src="persona.js"></script>
+  <script defer src="choko-knowledge.js"></script>
+  <script defer src="choko.js"></script>
+</body>
+</html>
