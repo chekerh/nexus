@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en" data-i18n>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>N</text></svg>">
+  <meta name="description" content="Admin login for Nexus-UGC. System owner access to the AI video generation platform.">
+  <meta property="og:title" content="Admin — Nexus-UGC">
+  <meta property="og:description" content="Admin login for Nexus-UGC. System owner access to the AI video generation platform.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <title>Admin — Nexus-UGC</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="admin.css">
+  <meta name="theme-color" content="#0a0e17">
+  <meta name="robots" content="noindex">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-192.svg">
+</head>
+<body class="admin-login-body">
+  <a href="#main-content" class="skip-to-content" data-i18n="common.skip-to-content">Skip to content</a>
+  <noscript><div style="position:fixed;inset:0;z-index:9999;background:#05080f;color:#94a3b8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:2rem;text-align:center"><h1 style="color:#fff;font-size:1.5rem;margin:0">JavaScript Required</h1><p>Nexus-UGC requires JavaScript. Please enable it in your browser settings.</p></div></noscript>
+  <main id="main-content"><div class="login-page">
+    <div class="glass-card login-card" style="max-width:420px;">
+      <div style="text-align:center;margin-bottom:1.5rem;">
+        <div style="width:48px;height:48px;border-radius:16px;background:var(--purple-dim);display:flex;align-items:center;justify-content:center;margin:0 auto 0.75rem;font-size:1.5rem;">🔐</div>
+        <h1 class="gradient-text" style="font-size:1.5rem;">Admin Panel</h1>
+        <p class="text-secondary text-sm">Sign in with admin credentials</p>
+      </div>
+
+      <form id="admin-login-form" novalidate>
+        <div class="form-group">
+          <label for="email-input">Email</label>
+          <input type="email" id="email-input" class="form-input" placeholder="admin@nexusugc.com" required autocomplete="email">
+          <div class="field-error hidden" id="email-error"></div>
+        </div>
+        <div class="form-group">
+          <label for="password-input">Password</label>
+          <input type="password" id="password-input" class="form-input" placeholder="••••••••" required autocomplete="current-password" minlength="6">
+          <div class="field-error hidden" id="password-error"></div>
+        </div>
+        <div class="field-error hidden" id="form-error" style="margin-bottom:0.5rem"></div>
+        <button type="submit" class="btn btn-primary w-full" id="admin-login-btn">Sign In</button>
+      </form>
+
+      <p class="text-xs text-dim text-center mt-2">
+        <a href="index.html" style="color:var(--cyan)">← Back to main site</a>
+      </p>
+    </div>
+  </div></main>
+
+  <div id="toast-container" aria-live="polite"></div>
+  <script src="i18n.js"></script>
+  <script src="api.js"></script>
+  <script defer src="ui.js"></script>
+  <script >
+    document.getElementById('admin-login-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      clearFieldErrors();
+
+      const email = document.getElementById('email-input').value.trim();
+      const password = document.getElementById('password-input').value;
+
+      if (!validateForm({
+        'email-input': { required: true, message: 'Email is required', label: 'Email' },
+        'password-input': { required: true, message: 'Password is required', label: 'Password' },
+      })) return;
+
+      const btn = document.getElementById('admin-login-btn');
+      btn.disabled = true;
+      btn.classList.add('btn-loading');
+      btn.textContent = 'Signing in...';
+      try {
+        const data = await login(email, password);
+        if (data.user.tier !== 'enterprise') {
+          throw new Error('Admin access required — only the system owner can access the admin panel');
+        }
+        window.location.href = 'admin.html';
+      } catch (err) {
+        document.getElementById('form-error').textContent = err.message || 'Login failed';
+        document.getElementById('form-error').classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btn.classList.remove('btn-loading');
+        btn.textContent = 'Sign In';
+      }
+    });
+  </script>
+</body>
+</html>

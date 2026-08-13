@@ -1,230 +1,456 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-i18n>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nexus-UGC Dashboard</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>N</text></svg>">
+  <meta name="description" content="Nexus-UGC — AI-powered viral video engine. Turn long-form videos into viral shorts with local AI. Free 5 credits/month.">
+  <meta property="og:title" content="Nexus-UGC — AI-Powered Viral Video Engine">
+  <meta property="og:description" content="Turn long-form videos into viral shorts automatically. 100% local and private.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <title>Nexus-UGC — AI-Powered Viral Video Engine</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="choko.css">
+  <meta name="theme-color" content="#0a0e17">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-192.svg">
 </head>
 <body>
-    <div class="app-container">
-        <!-- Sidebar -->
-        <aside class="sidebar">
-            <div class="logo">Nexus-UGC</div>
-            <nav>
-                <a href="index.html" class="nav-item active">AI Pipeline</a>
-                <a href="accounts.html" class="nav-item">Account Groups</a>
-                <a href="#" class="nav-item disabled">History</a>
-            </nav>
-
-            <section class="card sidebar-runtime" id="runtime-panel">
-                <h3>AI Runtime</h3>
-                <p class="accounts-subtitle" id="backend-status-label">Backend: checking...</p>
-                <button class="btn btn-secondary" id="unload-backend-btn">Release AI Memory</button>
-            </section>
-
-            <div class="user-section" id="user-section">
-                <span class="user-email" id="user-email"></span>
-                <button class="user-btn" id="login-btn">Sign In</button>
-                <button class="user-btn hidden" id="logout-btn">Logout</button>
-            </div>
-        </aside>
-
-        <!-- Main Content -->
-        <main class="main-content">
-            <header class="main-header">
-                    <h1>Viral Strategy Engine</h1>
-                    <p>Upload a video to generate local AI transcripts and hooks.</p>
-                    <div class="account-row" style="margin-top: 1rem; background: rgba(8,13,30,.55);">
-                        <div>
-                            <strong>Realtime AI Pipeline</strong>
-                            <span class="account-tag">Whisper</span>
-                            <span class="account-tag">Qwen</span>
-                            <span class="account-tag">FFmpeg</span>
-                        </div>
-                        <div class="account-tag" style="background: rgba(93,215,255,.22); border-color: rgba(93,215,255,.38); color: #d8f8ff;">Local-First</div>
-                    </div>
-                </header>
-
-                <!-- Upload Section -->
-                <section class="upload-section card">
-                <div class="input-tabs">
-                    <button class="tab-btn active" id="tab-file" data-tab="file">
-                        <span class="tab-icon">📤</span> Upload File
-                    </button>
-                    <button class="tab-btn" id="tab-drive" data-tab="drive">
-                        <span class="tab-icon">☁️</span> Google Drive
-                    </button>
-                    <button class="tab-btn" id="tab-endscreen" data-tab="endscreen">
-                        <span class="tab-icon">🎯</span> End Screen
-                    </button>
-                </div>
-                
-                <div class="tab-content active" id="content-file">
-                    <div class="drive-section-header">
-                        <div class="drive-icon" style="background: linear-gradient(135deg, #5dd7ff, #6c7cff);">📹</div>
-                        <span class="drive-section-title">Upload Local Video</span>
-                    </div>
-                    <div class="upload-dropzone" id="dropzone">
-                        <div class="dropzone-icon">📂</div>
-                        <p class="dropzone-text">Drag and drop your video file or click to browse</p>
-                        <p class="dropzone-hint">Supports MP4, MOV, AVI, MKV, WebM</p>
-                        <input type="file" id="file-input" accept="video/*" hidden>
-                    </div>
-                    <div class="inline-controls">
-                        <div class="language-selector">
-                            <label for="lang-select">Caption Language</label>
-                            <select id="lang-select" class="lang-select">
-                                <option value="en">English (original)</option>
-                                <option value="es">Español</option>
-                                <option value="fr">Français</option>
-                                <option value="de">Deutsch</option>
-                                <option value="it">Italiano</option>
-                                <option value="pt">Português</option>
-                                <option value="ru">Русский</option>
-                                <option value="ja">日本語</option>
-                                <option value="ko">한국어</option>
-                                <option value="zh">中文</option>
-                                <option value="ar">العربية</option>
-                                <option value="hi">हिन्दी</option>
-                                <option value="nl">Nederlands</option>
-                                <option value="tr">Türkçe</option>
-                                <option value="vi">Tiếng Việt</option>
-                                <option value="th">ไทย</option>
-                            </select>
-                        </div>
-                        <div class="language-selector">
-                            <label for="ar-select">Aspect Ratio</label>
-                            <select id="ar-select" class="lang-select">
-                                <option value="vertical_9_16">Vertical 9:16 (TikTok/Reels)</option>
-                                <option value="square_1_1">Square 1:1 (Instagram)</option>
-                                <option value="portrait_4_5">Portrait 4:5 (Facebook)</option>
-                                <option value="landscape_16_9">Landscape 16:9 (YouTube)</option>
-                                <option value="source">Original (no reframe)</option>
-                            </select>
-                        </div>
-                    </div>
-                    <p class="input-hint" style="margin-top:-0.5rem;margin-bottom:0.75rem;">Translation uses local AI (Ollama)</p>
-                    <button class="btn btn-primary" id="process-btn" disabled>Start Analysis</button>
-                </div>
-                
-                <div class="tab-content" id="content-drive">
-                    <div class="drive-section-header">
-                        <div class="drive-icon">📁</div>
-                        <span class="drive-section-title">Import from Google Drive</span>
-                    </div>
-                    <div class="drive-input-wrapper">
-                        <input type="text" id="drive-url" class="drive-input" placeholder="Paste Google Drive shareable link (e.g., https://drive.google.com/file/d/...)">
-                        <p class="input-hint">Make sure the file is shared with "Anyone with the link can view"</p>
-                    </div>
-                    <div class="inline-controls">
-                        <div class="language-selector">
-                            <label for="drive-lang-select">Caption Language</label>
-                            <select id="drive-lang-select" class="lang-select">
-                                <option value="en">English (original)</option>
-                                <option value="es">Español</option>
-                                <option value="fr">Français</option>
-                                <option value="de">Deutsch</option>
-                                <option value="it">Italiano</option>
-                                <option value="pt">Português</option>
-                                <option value="ru">Русский</option>
-                                <option value="ja">日本語</option>
-                                <option value="ko">한국어</option>
-                                <option value="zh">中文</option>
-                                <option value="ar">العربية</option>
-                                <option value="hi">हिन्दी</option>
-                                <option value="nl">Nederlands</option>
-                                <option value="tr">Türkçe</option>
-                                <option value="vi">Tiếng Việt</option>
-                                <option value="th">ไทย</option>
-                            </select>
-                        </div>
-                        <div class="language-selector">
-                            <label for="drive-ar-select">Aspect Ratio</label>
-                            <select id="drive-ar-select" class="lang-select">
-                                <option value="vertical_9_16">Vertical 9:16 (TikTok/Reels)</option>
-                                <option value="square_1_1">Square 1:1 (Instagram)</option>
-                                <option value="portrait_4_5">Portrait 4:5 (Facebook)</option>
-                                <option value="landscape_16_9">Landscape 16:9 (YouTube)</option>
-                                <option value="source">Original (no reframe)</option>
-                            </select>
-                        </div>
-                    </div>
-                    <button class="btn btn-primary" id="process-drive-btn">Fetch from Drive & Analyze</button>
-                </div>
-
-                <div class="tab-content" id="content-endscreen">
-                    <div class="drive-section-header">
-                        <div class="drive-icon" style="background: linear-gradient(135deg, #ff6b9d, #feca57);">🎯</div>
-                        <span class="drive-section-title">End Screen & Call-to-Action</span>
-                    </div>
-                    <div class="endscreen-preview" id="endscreen-preview">
-                        <div class="endscreen-placeholder">
-                            <div class="endscreen-icon">🖼️</div>
-                            <p class="endscreen-text">No end screen image selected</p>
-                        </div>
-                        <img id="endscreen-img-preview" class="endscreen-img hidden" alt="End screen preview">
-                    </div>
-                    <div class="upload-dropzone endscreen-dropzone" id="endscreen-dropzone">
-                        <div class="dropzone-icon">📸</div>
-                        <p class="dropzone-text">Click to upload end screen image</p>
-                        <p class="dropzone-hint">Recommended: 1080x1920 (9:16) for vertical videos</p>
-                        <input type="file" id="endscreen-input" accept="image/*" hidden>
-                    </div>
-                    <div class="cta-input-wrapper">
-                        <label for="cta-text-input" class="cta-label">Call-to-Action Text</label>
-                        <input type="text" id="cta-text-input" class="cta-text-input" value="Link in bio to try it free." placeholder="Enter your call-to-action...">
-                        <p class="input-hint">This text will appear on the end screen image at the end of each clip</p>
-                    </div>
-                    <div class="endscreen-status" id="endscreen-status">
-                        <span class="endscreen-badge inactive" id="endscreen-badge">No end screen set</span>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Status Section -->
-            <section id="status-section" class="status-section hidden">
-                <div class="thinking-header">
-                    <span class="pulse-dot"></span>
-                    <h2 id="status-title">AI Processing...</h2>
-                </div>
-                <div class="status-meta-row">
-                    <span class="account-tag timer-tag">Elapsed: <strong id="status-timer">00:00</strong></span>
-                    <span class="account-tag" id="timing-summary">Awaiting stage metrics...</span>
-                </div>
-                <div id="thinking-console" class="thinking-console">
-                    <!-- Thoughts will be injected here -->
-                </div>
-                <button class="btn btn-danger" id="stop-btn">Stop Analysis</button>
-            </section>
-
-            <!-- Results Section -->
-            <section id="results-section" class="results-section hidden">
-                <div class="grid-layout">
-                    <!-- Transcription Column -->
-                    <div class="card result-card">
-                        <h3>Local Transcript</h3>
-                        <div id="transcript-content" class="text-content"></div>
-                    </div>
-
-                    <!-- AI Strategy Column -->
-                    <div class="card result-card">
-                        <h3>Viral Hooks & Captions</h3>
-                        <div id="analysis-content" class="text-content"></div>
-                    </div>
-                </div>
-
-                <!-- Video Clips Section -->
-                <div id="clips-container" class="clips-grid"></div>
-                <div id="publish-console" class="publish-console"></div>
-            </section>
-        </main>
+  <a href="#main-content" class="skip-to-content" data-i18n="common.skip-to-content">Skip to content</a>
+  <noscript>
+    <div style="position:fixed;inset:0;z-index:9999;background:#05080f;color:#94a3b8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:2rem;text-align:center">
+      <h1 style="color:#fff;font-size:1.5rem;margin:0">JavaScript Required</h1>
+      <p>Nexus-UGC requires JavaScript. Please enable it in your browser settings.</p>
+      <p style="font-size:0.8rem;color:#64748b">This app uses JavaScript for AI generation, video previews, and interactive controls.</p>
     </div>
-    <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
-    <script src="api.js"></script>
-    <script src="script.js"></script>
+  </noscript>
+  <canvas id="particle-canvas"></canvas>
+
+  <div class="app-wrapper">
+    <!-- ============ NAVBAR ============ -->
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <div class="brand-icon">N</div>
+      <a href="index.html"><span>Nexus<span class="gradient-text">UGC</span></span></a>
+    </div>
+    <div class="navbar-nav" id="main-nav">
+      <a href="#features"><span class="nav-label" data-i18n="index.nav-features">Features</span></a>
+      <a href="#pricing"><span class="nav-label" data-i18n="index.nav-pricing">Pricing</span></a>
+    </div>
+    <button class="mobile-nav-toggle" aria-label="Toggle navigation">☰</button>
+    <div class="navbar-actions" id="main-nav-actions">
+      <span class="user-email" id="user-email"></span>
+      <a href="login.html" class="btn btn-ghost btn-sm" id="login-btn" data-i18n="common.sign-in">Sign In</a>
+      <button class="btn btn-ghost btn-sm hidden" id="logout-btn" data-i18n="common.logout">Logout</button>
+    </div>
+  </nav>
+
+  <main id="main-content">
+
+    <!-- ============ HERO ============ -->
+    <section class="hero" id="home">
+      <div class="hero-orb hero-orb-1"></div>
+      <div class="hero-orb hero-orb-2"></div>
+
+      <div class="hero-badge" data-i18n="index.hero-badge">
+        <span class="dot"></span>
+        AI Pipeline v3 — Now with Multi-Language & Virality Scoring
+      </div>
+
+      <div class="problem-section">
+        <h2 data-i18n="index.hero-problem-title">Your Video, Wasted</h2>
+        <p data-i18n="index.hero-problem-desc">Long-form videos sit unused. Hours of content. Zero reach. No audience. No growth.</p>
+        <table>
+          <tbody>
+            <tr><td>❌</td><td>Edit manually — 3+ hours per clip</td></tr>
+            <tr><td>❌</td><td>Pay cloud services — $0.50+ per minute</td></tr>
+            <tr><td>❌</td><td>Lose privacy — your data goes to the cloud</td></tr>
+            <tr><td>❌</td><td>Miss opportunities — every day delayed = fewer views</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="solution-section">
+        <h2 data-i18n="index.hero-solution-title">Your GPU. Your Videos. Your Audience.</h2>
+        <p data-i18n="index.hero-solution-desc">100% local AI turns every long-form video into viral-optimized shorts — in 16 languages, with auto-reframe, virality scoring, and animated captions. No cloud. No recurring fees.</p>
+      </div>
+
+      <div class="hero-actions">
+        <button class="btn btn-primary btn-lg" id="hero-cta" data-i18n="index.hero-cta">Upload Your First Video</button>
+        <button class="btn btn-secondary btn-lg" id="scroll-to-features" data-i18n="index.hero-see-how">See How It Works</button>
+      </div>
+      <div class="hero-cta-badge" style="margin-top:1rem;font-size:0.875rem;">
+        <span style="color:var(--cyan);font-weight:600;">🆓 Free forever — 5 videos/month, no credit card ever</span>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat">
+          <div class="hero-stat-value">100%</div>
+          <div class="hero-stat-label" data-i18n="index.hero-stat-local">Local & Private</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-value">16</div>
+          <div class="hero-stat-label" data-i18n="index.hero-stat-langs">Languages</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-value">3×</div>
+          <div class="hero-stat-label" data-i18n="index.hero-stat-faster">Faster Output</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ DASHBOARD ============ -->
+    <section class="section" id="dashboard-section" style="display:none;">
+      <div class="section-header">
+        <span class="section-label" data-i18n="index.section-dashboard">Dashboard</span>
+        <h2 class="section-title" data-i18n="index.section-dashboard-title">Account <span class="gradient-text">Overview</span></h2>
+        <p class="section-subtitle" data-i18n="index.section-dashboard-subtitle">Connected platforms, publishing activity, and content status at a glance.</p>
+      </div>
+      <div id="dashboard-content">
+        <div class="dashboard-grid" id="dashboard-stats">
+          <div class="stat-card">
+            <div class="stat-value" id="stat-linked">0</div>
+            <div class="stat-label">Connected</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="stat-pending">0</div>
+            <div class="stat-label">Pending</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="stat-posted">0</div>
+            <div class="stat-label">Posted</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="stat-failed">0</div>
+            <div class="stat-label">Failed</div>
+          </div>
+        </div>
+        <div class="two-col" style="margin-top:1rem;">
+          <div class="content-card">
+            <h3 style="margin:0 0 0.75rem">🔗 Connected Accounts</h3>
+            <div id="accounts-list"><p style="color:var(--text-dim);font-size:0.875rem">No accounts connected yet.</p></div>
+          </div>
+          <div class="content-card">
+            <h3 style="margin:0 0 0.75rem">📤 Recent Posts</h3>
+            <div id="posts-list"><p style="color:var(--text-dim);font-size:0.875rem">No posts yet. Generate one from Brain Rot!</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ FEATURES ============ -->
+    <section class="section" id="features">
+      <div class="section-header">
+        <span class="section-label" data-i18n="index.features-label">Features</span>
+        <h2 class="section-title" data-i18n="index.features-title">Everything You Need to <span class="gradient-text">Go Viral</span></h2>
+        <p class="section-subtitle" data-i18n="index.features-subtitle">AI-powered tools that professional creators use — now running entirely on your machine.</p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card glass-card reveal reveal-delay-1">
+          <div class="feature-icon cyan">🌐</div>
+          <h3 data-i18n="index.feature-multilang-title">Multi-Language Captions</h3>
+          <p data-i18n="index.feature-multilang-desc">Translate captions to 16 languages including Spanish, Japanese, Arabic, and Hindi — all via local AI, no cloud dependency.</p>
+        </div>
+        <div class="feature-card glass-card reveal reveal-delay-2">
+          <div class="feature-icon purple">📊</div>
+          <h3 data-i18n="index.feature-virality-title">Virality Score 1–100</h3>
+          <p data-i18n="index.feature-virality-desc">Every clip gets a hybrid heuristic + AI virality prediction. Know which clip will perform before you post.</p>
+        </div>
+        <div class="feature-card glass-card reveal reveal-delay-3">
+          <div class="feature-icon green">🔄</div>
+          <h3 data-i18n="index.feature-reframe-title">Auto Reframe</h3>
+          <p data-i18n="index.feature-reframe-desc">Output in any aspect ratio: 9:16 for TikTok/Reels, 1:1 for Instagram, 16:9 for YouTube, 4:5 for Facebook.</p>
+        </div>
+        <div class="feature-card glass-card reveal reveal-delay-4">
+          <div class="feature-icon amber">🎯</div>
+          <h3 data-i18n="index.feature-transcription-title">Smart Transcription</h3>
+          <p data-i18n="index.feature-transcription-desc">Whisper.cpp-powered transcription with word-level timestamps. Scene detection and speech density analysis.</p>
+        </div>
+        <div class="feature-card glass-card reveal reveal-delay-5">
+          <div class="feature-icon cyan">🎬</div>
+          <h3 data-i18n="index.feature-captions-title">Animated Captions</h3>
+          <p data-i18n="index.feature-captions-desc">6 caption styles (impact, question, money, warning, hype, neutral) with AI-driven style selection per cue.</p>
+        </div>
+<div class="feature-card glass-card reveal reveal-delay-5">
+          <div class="feature-icon cyan">🎬</div>
+          <h3 data-i18n="index.feature-publish-title">One-Click Publish</h3>
+          <p data-i18n="index.feature-publish-desc">Publish directly to TikTok, Instagram, and YouTube from the dashboard. Account Groups for batch posting.</p>
+        </div>
+        <div class="feature-card glass-card reveal reveal-delay-5" style="grid-row: auto / auto;">
+          <div class="feature-icon gray">⚙️</div>
+          <h3>Runs on Your Machine</h3>
+          <p>All AI processing occurs locally — Whisper.cpp for transcription, Ollama for analysis. No cloud costs, no data leaves your machine. <a href="#hardware-check" style="color:var(--cyan);">Check your hardware</a></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ APP / UPLOAD SECTION ============ -->
+    <section class="section" id="app">
+      <div class="section-header">
+        <span class="section-label" data-i18n="index.upload-label">Launch Pipeline</span>
+        <h2 class="section-title" data-i18n="index.upload-title">Upload & <span class="gradient-text">Process</span></h2>
+        <p class="section-subtitle" data-i18n="index.upload-subtitle">Drop a video, choose your language and aspect ratio, and let AI do the rest.</p>
+      </div>
+
+      <div class="glass-card upload-section">
+        <div class="input-tabs">
+          <button class="tab-btn active" id="tab-file" data-tab="file">
+            <span>📤</span> Upload File
+          </button>
+          <button class="tab-btn" id="tab-drive" data-tab="drive">
+            <span>☁️</span> Google Drive
+          </button>
+          <button class="tab-btn" id="tab-endscreen" data-tab="endscreen">
+            <span>🎯</span> End Screen
+          </button>
+        </div>
+
+        <!-- Upload File Tab -->
+        <div class="tab-content active" id="content-file">
+          <div class="upload-dropzone" id="dropzone">
+            <div class="dropzone-icon">📂</div>
+            <p class="dropzone-text">Drop your video here or click to browse</p>
+            <p class="dropzone-hint">Supports MP4, MOV, AVI, MKV, WebM — up to 2GB</p>
+            <input type="file" id="file-input" accept="video/*" hidden>
+          </div>
+          <div class="inline-controls">
+            <div class="language-selector">
+              <label>Caption Language</label>
+              <select id="lang-select" class="lang-select">
+                <option value="en">🇬🇧 English (original)</option>
+                <option value="es">🇪🇸 Español</option>
+                <option value="fr">🇫🇷 Français</option>
+                <option value="de">🇩🇪 Deutsch</option>
+                <option value="it">🇮🇹 Italiano</option>
+                <option value="pt">🇵🇹 Português</option>
+                <option value="ru">🇷🇺 Русский</option>
+                <option value="ja">🇯🇵 日本語</option>
+                <option value="ko">🇰🇷 한국어</option>
+                <option value="zh">🇨🇳 中文</option>
+                <option value="ar">🇸🇦 العربية</option>
+                <option value="hi">🇮🇳 हिन्दी</option>
+                <option value="nl">🇳🇱 Nederlands</option>
+                <option value="tr">🇹🇷 Türkçe</option>
+                <option value="vi">🇻🇳 Tiếng Việt</option>
+                <option value="th">🇹🇭 ไทย</option>
+              </select>
+            </div>
+            <div class="language-selector">
+              <label>Output Format</label>
+              <select id="ar-select" class="lang-select">
+                <option value="vertical_9_16">📱 Vertical 9:16 (TikTok/Reels)</option>
+                <option value="square_1_1">📐 Square 1:1 (Instagram)</option>
+                <option value="portrait_4_5">📋 Portrait 4:5 (Facebook)</option>
+                <option value="landscape_16_9">🖥️ Landscape 16:9 (YouTube)</option>
+                <option value="source">📦 Original (no reframe)</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-lg w-full" id="process-btn" disabled>Start Analysis</button>
+        </div>
+
+        <!-- Drive Tab -->
+        <div class="tab-content" id="content-drive">
+          <div class="inline-controls" style="margin-bottom:1rem;">
+            <input type="text" id="drive-url" class="form-input" placeholder="Paste Google Drive shareable link...">
+          </div>
+          <div class="inline-controls">
+            <div class="language-selector">
+              <label>Caption Language</label>
+              <select id="drive-lang-select" class="lang-select">
+                <option value="en">🇬🇧 English (original)</option>
+                <option value="es">🇪🇸 Español</option>
+                <option value="fr">🇫🇷 Français</option>
+                <option value="de">🇩🇪 Deutsch</option>
+                <option value="ja">🇯🇵 日本語</option>
+                <option value="ar">🇸🇦 العربية</option>
+              </select>
+            </div>
+            <div class="language-selector">
+              <label>Output Format</label>
+              <select id="drive-ar-select" class="lang-select">
+                <option value="vertical_9_16">📱 Vertical 9:16 (TikTok/Reels)</option>
+                <option value="square_1_1">📐 Square 1:1 (Instagram)</option>
+                <option value="portrait_4_5">📋 Portrait 4:5 (Facebook)</option>
+                <option value="landscape_16_9">🖥️ Landscape 16:9 (YouTube)</option>
+                <option value="source">📦 Original</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-lg w-full" id="process-drive-btn">Fetch from Drive & Analyze</button>
+        </div>
+
+        <!-- End Screen Tab -->
+        <div class="tab-content" id="content-endscreen">
+          <div class="upload-dropzone endscreen-dropzone" id="endscreen-dropzone">
+            <div class="dropzone-icon">🖼️</div>
+            <p class="dropzone-text">Upload end screen image</p>
+            <p class="dropzone-hint">Recommended: 1080×1920 — will appear at the end of each clip</p>
+            <input type="file" id="endscreen-input" accept="image/*" hidden>
+          </div>
+          <div class="inline-controls">
+            <input type="text" id="cta-text-input" class="form-input" value="Link in bio to try it free." placeholder="Call-to-action text...">
+          </div>
+          <div class="flex items-center gap-2 mt-1">
+            <span class="endscreen-badge inactive" id="endscreen-badge">No end screen set</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ PROCESSING STATUS ============ -->
+    <section class="section" id="status-section" style="display:none;">
+      <div class="glass-card status-section">
+        <div class="thinking-header">
+          <span class="pulse-dot"></span>
+          <h2 id="status-title">AI Processing...</h2>
+        </div>
+        <div class="status-meta-row">
+          <span class="text-xs text-dim">Elapsed: <strong id="status-timer">00:00</strong></span>
+          <span class="text-xs text-dim" id="timing-summary">Awaiting stage metrics...</span>
+        </div>
+        <div id="thinking-console" class="thinking-console">
+          <div class="thinking-line">Initializing local AI pipeline...</div>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-bar-fill" id="progress-fill"></div>
+        </div>
+        <button class="btn btn-danger btn-sm mt-2" id="stop-btn">Stop Analysis</button>
+      </div>
+    </section>
+
+    <!-- ============ RESULTS ============ -->
+    <section class="section" id="results-section" style="display:none;">
+      <div class="section-header">
+        <span class="section-label" data-i18n="index.results-label">Results</span>
+        <h2 class="section-title" data-i18n="index.results-title">Your <span class="gradient-text">Clips</span> Are Ready</h2>
+        <p class="section-subtitle" data-i18n="index.results-subtitle">Download, preview, and publish each clip directly to your accounts.</p>
+      </div>
+
+      <div class="results-grid">
+        <div class="glass-card result-card">
+          <h3>📝 Transcript</h3>
+          <div id="transcript-content" class="text-content"></div>
+        </div>
+        <div class="glass-card result-card">
+          <h3>🎯 Viral Hooks & Scores</h3>
+          <div id="analysis-content" class="text-content"></div>
+        </div>
+      </div>
+
+      <div id="clips-container" class="clips-grid"></div>
+      <div id="publish-console" class="publish-console"></div>
+    </section>
+
+    <!-- ============ PRICING ============ -->
+    <section class="section" id="pricing">
+      <div class="section-header">
+        <span class="section-label" data-i18n="index.pricing-label">Pricing</span>
+        <h2 class="section-title" data-i18n="index.pricing-title">Simple, <span class="gradient-text">Transparent</span> Pricing</h2>
+        <p class="section-subtitle" data-i18n="index.pricing-subtitle">Start free. Upgrade when you need more. No hidden fees, no cloud costs.</p>
+      </div>
+      <div class="pricing-grid">
+        <div class="pricing-card glass-card featured reveal">
+          <div class="pricing-name" data-i18n="index.plan-free-name">Free</div>
+          <div class="pricing-desc" data-i18n="index.plan-free-desc">For casual creators — forever free</div>
+          <div class="pricing-price" style="color:var(--text-secondary);font-size:1.5rem;">$0 <span>/mo</span></div>
+          <div class="pricing-period" data-i18n="index.plan-free-period">5 credits per month</div>
+          <ul class="pricing-features">
+            <li>5 video processes/month</li>
+            <li>English captions only</li>
+            <li>Standard aspect ratios</li>
+            <li>Virality Score included</li>
+            <li>Local processing only</li>
+            <li>🆓 No credit card ever</li>
+          </ul>
+          <button class="btn btn-primary w-full" id="scroll-to-app-1" data-i18n="index.plan-free-cta">Get Started</button>
+        </div>
+        <div class="pricing-card glass-card reveal reveal-delay-2">
+          <div class="pricing-name" data-i18n="index.plan-pro-name">Pro</div>
+          <div class="pricing-desc" data-i18n="index.plan-pro-desc">For serious creators</div>
+          <div class="pricing-price" style="color:var(--cyan);">$19 <span>/mo</span></div>
+          <div class="pricing-period" data-i18n="index.plan-pro-period">60 minutes of video</div>
+          <ul class="pricing-features">
+            <li>60 min video processing</li>
+            <li>All 16 languages</li>
+            <li>All aspect ratios</li>
+            <li>Virality Score + AI analysis</li>
+            <li>End screen & CTA support</li>
+            <li>Priority processing</li>
+          </ul>
+          <button class="btn btn-primary w-full" id="scroll-to-app-2" data-i18n="index.plan-pro-cta">Upgrade to Pro</button>
+        </div>
+        <div class="pricing-card glass-card reveal reveal-delay-4">
+          <div class="pricing-name" data-i18n="index.plan-enterprise-name">Enterprise</div>
+          <div class="pricing-desc" data-i18n="index.plan-enterprise-desc">For teams & agencies</div>
+          <div class="pricing-price" style="color:var(--purple);">$99 <span>/mo</span></div>
+          <div class="pricing-period" data-i18n="index.plan-enterprise-period">Unlimited processing</div>
+          <ul class="pricing-features">
+            <li>Unlimited video processing</li>
+            <li>All languages + custom models</li>
+            <li>All aspect ratios + custom</li>
+            <li>API access & webhooks</li>
+            <li>Team collaboration</li>
+            <li>Priority support & SLA</li>
+          </ul>
+          <button class="btn btn-secondary w-full" id="scroll-to-app-3" data-i18n="index.plan-enterprise-cta">Contact Sales</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+    <!-- ============ FOOTER ============ -->
+    <footer class="footer" id="footer">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <div class="navbar-brand">
+            <div class="brand-icon">N</div>
+            <span>Nexus<span class="gradient-text">UGC</span></span>
+          </div>
+          <p data-i18n="footer.brand-desc">AI-powered viral video engine. 100% local. 100% private. Built for creators who value their data.</p>
+        </div>
+        <div>
+          <h4 data-i18n="footer.product">Product</h4>
+          <a href="#features" data-i18n="footer.features">Features</a>
+          <a href="#pricing" data-i18n="footer.pricing">Pricing</a>
+          <a href="accounts.html" data-i18n="footer.accounts">Accounts</a>
+          <a href="login.html" data-i18n="footer.sign-in">Sign In</a>
+        </div>
+        <div>
+          <h4 data-i18n="footer.resources">Resources</h4>
+          <a href="#" data-i18n="footer.documentation">Documentation</a>
+          <a href="#" data-i18n="footer.api-reference">API Reference</a>
+          <a href="#" data-i18n="footer.changelog">Changelog</a>
+          <a href="#" data-i18n="footer.status">Status</a>
+        </div>
+        <div>
+          <h4 data-i18n="footer.legal">Legal</h4>
+          <a href="terms.html" data-i18n="footer.terms">Terms of Service</a>
+          <a href="privacy.html" data-i18n="footer.privacy">Privacy Policy</a>
+          <a href="settings.html" data-i18n="footer.settings">Settings</a>
+          <a href="admin-login.html" data-i18n="footer.admin">Admin</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span data-i18n="footer.copyright">© 2026 Nexus-UGC. Built with local AI.</span>
+      </div>
+    </footer>
+  </div>
+
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <script src="i18n.js"></script>
+  <script src="api.js"></script>
+  <script defer src="particles.js"></script>
+  <script defer src="ui.js"></script>
+  <script defer src="script.js"></script>
+  <script defer src="choko-knowledge.js"></script>
+  <script defer src="choko.js"></script>
 </body>
 </html>

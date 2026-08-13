@@ -100,7 +100,7 @@
   <script src="i18n.js"></script>
   <script src="api.js"></script>
   <script defer src="ui.js"></script>
-  <script nonce="__CSP_NONCE__">
+  <script >
     const googleSigninContainer = document.getElementById('google-signin-container');
     fetch('/api/v1/auth/google-config')
       .then(response => response.ok ? response.json() : { enabled: false, client_id: '' })

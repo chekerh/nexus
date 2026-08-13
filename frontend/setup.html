@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en" data-i18n>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>N</text></svg>">
+  <meta name="description" content="Set up Nexus-UGC for first use. Configure AI backends, API keys, and hardware detection for local processing.">
+  <meta property="og:title" content="Setup Wizard — Nexus-UGC">
+  <meta property="og:description" content="Set up Nexus-UGC for first use. Configure AI backends, API keys, and hardware detection for local processing.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <title>Setup Wizard — Nexus-UGC</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="choko.css">
+  <style>
+    .wizard-wrap { max-width: 860px; margin: 2rem auto; padding: 0 1rem; }
+    .step-indicator { display: flex; gap: 0.25rem; margin-bottom: 2rem; justify-content: center; }
+    .step-dot { display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.7rem; border-radius: 999px; font-size: 0.7rem; font-weight: 600; background: rgba(255,255,255,0.04); color: var(--text-dim); border: 1px solid transparent; transition: all 0.3s; white-space: nowrap; }
+    .step-dot.active { background: rgba(0,229,255,0.12); color: var(--cyan); border-color: rgba(0,229,255,0.3); }
+    .step-dot.done { background: rgba(34,197,94,0.12); color: var(--green); border-color: rgba(34,197,94,0.3); }
+    .step-dot .num { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; font-size: 0.6rem; background: rgba(255,255,255,0.06); }
+    .step-dot.active .num { background: rgba(0,229,255,0.2); }
+    .step-dot.done .num { background: rgba(34,197,94,0.2); }
+
+    .wizard-step { display: none; }
+    .wizard-step.active { display: block; }
+
+    .detect-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .detect-item { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 0.75rem 1rem; }
+    .detect-item .label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); }
+    .detect-item .value { font-size: 0.9rem; font-weight: 600; margin-top: 0.2rem; }
+    .detect-item .sub { font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.1rem; }
+
+    .rec-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 1rem; }
+    .rec-card h4 { font-size: 0.8rem; font-weight: 700; margin: 0 0 0.3rem 0; display: flex; align-items: center; gap: 0.5rem; }
+    .rec-card .model-name { font-size: 0.9rem; font-weight: 600; color: var(--cyan); }
+    .rec-card .rec-detail { font-size: 0.72rem; color: var(--text-secondary); }
+
+    .model-tag { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+    .model-tag-t0 { background: rgba(148,163,184,0.15); color: var(--text-dim); }
+    .model-tag-t1 { background: rgba(34,197,94,0.15); color: var(--green); }
+    .model-tag-t2 { background: rgba(0,229,255,0.15); color: var(--cyan); }
+    .model-tag-t3 { background: rgba(139,92,246,0.15); color: var(--purple); }
+    .model-tag-installed::after { content: ' ✓ installed'; font-weight: 400; color: var(--green); }
+
+    .pill-ok { background: rgba(34,197,94,0.12); color: var(--green); border: 1px solid rgba(34,197,94,0.2); }
+    .pill-warn { background: rgba(245,158,11,0.12); color: var(--amber); border: 1px solid rgba(245,158,11,0.2); }
+    .pill-missing { background: rgba(239,68,68,0.12); color: var(--red); border: 1px solid rgba(239,68,68,0.2); }
+
+    .setup-card { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-md); padding: 1.25rem; margin-bottom: 1rem; backdrop-filter: blur(12px); }
+    .setup-steps { padding-left: 1.25rem; line-height: 1.8; font-size: 0.85rem; }
+    .setup-steps li { margin-bottom: 0.3rem; }
+    .setup-steps code { font-size: 0.75rem; }
+
+    .wizard-actions { display: flex; gap: 0.75rem; justify-content: space-between; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.06); }
+
+    .env-grid { display: grid; gap: 0.5rem; }
+    .env-row { display: flex; gap: 0.5rem; align-items: center; }
+    .env-row label { font-size: 0.72rem; min-width: 180px; color: var(--text-secondary); font-family: monospace; }
+    .env-row input { flex: 1; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 0.5rem 0.75rem; color: var(--text-primary); font-family: monospace; font-size: 0.75rem; }
+    .env-row input:focus { outline: none; border-color: var(--cyan); }
+
+    @media (max-width: 640px) {
+      .detect-grid { grid-template-columns: 1fr; }
+      .step-dot span.label-text { display: none; }
+      .env-row { flex-direction: column; align-items: stretch; }
+      .env-row label { min-width: auto; }
+    }
+  </style>
+  <meta name="theme-color" content="#0a0e17">
+  <meta name="robots" content="noindex">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-192.svg">
+</head>
+<body>
+  <a href="#main-content" class="skip-to-content" data-i18n="common.skip-to-content">Skip to content</a>
+  <noscript><div style="position:fixed;inset:0;z-index:9999;background:#05080f;color:#94a3b8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:2rem;text-align:center"><h1 style="color:#fff;font-size:1.5rem;margin:0">JavaScript Required</h1><p>Nexus-UGC requires JavaScript. Please enable it in your browser settings.</p></div></noscript>
+  <canvas id="particle-canvas"></canvas>
+  <div class="app-wrapper">
+    <nav class="navbar">
+      <div class="navbar-brand">
+        <div class="brand-icon">N</div>
+        <a href="index.html"><span>Nexus<span class="gradient-text">UGC</span></span></a>
+      </div>
+      <button class="mobile-nav-toggle" aria-label="Toggle navigation">☰</button>
+      <div class="navbar-actions">
+        <span class="user-email" id="user-email"></span>
+<button class="btn btn-ghost btn-sm" id="login-btn" data-i18n="common.sign-in">Sign In</button>
+      <button class="btn btn-ghost btn-sm hidden" id="logout-btn" data-i18n="common.logout">Logout</button>
+      </div>
+    </nav>
+
+    <main class="wizard-wrap" id="main-content">
+      <div style="text-align:center;margin-bottom:1.5rem">
+        <h1 style="font-size:1.75rem;font-weight:800;letter-spacing:-0.5px;margin:0 0 0.25rem">
+          Setup <span class="gradient-text">Wizard</span>
+        </h1>
+        <p style="color:var(--text-secondary);margin:0">
+          Detect your hardware, pick the best models, and connect your platforms.
+        </p>
+      </div>
+
+      <!-- Step Indicator -->
+      <div class="step-indicator" id="step-indicator">
+        <div class="step-dot active" data-step="1"><span class="num">1</span> <span class="label-text">Hardware</span></div>
+        <div class="step-dot" data-step="2"><span class="num">2</span> <span class="label-text">Models</span></div>
+        <div class="step-dot" data-step="3"><span class="num">3</span> <span class="label-text">API Keys</span></div>
+        <div class="step-dot" data-step="4"><span class="num">4</span> <span class="label-text">Platforms</span></div>
+        <div class="step-dot" data-step="5"><span class="num">5</span> <span class="label-text">Finish</span></div>
+      </div>
+
+      <!-- Step 1: Hardware Detection -->
+      <div class="wizard-step active" id="step-1">
+        <div class="setup-card">
+          <div class="admin-section-title">🔍 Detecting Your Hardware</div>
+          <p class="text-secondary" style="font-size:0.85rem;margin-bottom:1rem;">
+            Checking your system specs to recommend the best models for your machine.
+          </p>
+          <div id="hw-detection-status" style="text-align:center;padding:2rem;">
+            <div class="spinner" style="width:32px;height:32px;border:3px solid rgba(0,229,255,0.15);border-top-color:var(--cyan);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 1rem;"></div>
+            <p class="text-secondary">Scanning hardware &amp; Ollama models…</p>
+          </div>
+          <div id="hw-results" style="display:none;">
+            <div class="detect-grid">
+              <div class="detect-item"><div class="label">RAM</div><div class="value" id="hw-ram"></div><div class="sub" id="hw-ram-tier"></div></div>
+              <div class="detect-item"><div class="label">CPU</div><div class="value" id="hw-cpu"></div><div class="sub" id="hw-cpu-cores"></div></div>
+              <div class="detect-item"><div class="label">Apple Silicon / GPU</div><div class="value" id="hw-silicon"></div><div class="sub" id="hw-gpu"></div></div>
+              <div class="detect-item"><div class="label">System</div><div class="value" id="hw-platform"></div><div class="sub" id="hw-sys-extra"></div></div>
+              <div class="detect-item"><div class="label">Ollama</div><div class="value" id="hw-ollama"></div><div class="sub" id="hw-ollama-models"></div></div>
+              <div class="detect-item"><div class="label">FFmpeg</div><div class="value" id="hw-ffmpeg"></div><div class="sub">Video processing pipeline</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="wizard-actions">
+          <span></span>
+          <button class="btn btn-primary" id="step1-continue">Continue →</button>
+        </div>
+      </div>
+
+      <!-- Step 2: Model Recommendations -->
+      <div class="wizard-step" id="step-2">
+        <div class="setup-card">
+          <div class="admin-section-title">🤖 Recommended Models <span style="font-size:0.7rem;font-weight:400;color:var(--text-secondary);">based on your hardware</span></div>
+          <p class="text-secondary" style="font-size:0.85rem;margin-bottom:1rem;">
+            These models match your system tier. Already-installed models get priority.
+          </p>
+          <div id="model-rec-status" style="text-align:center;padding:1rem;">
+            <p class="text-secondary">Loading recommendations…</p>
+          </div>
+          <div id="model-rec-results" style="display:none;">
+            <div style="display:grid;gap:0.75rem;">
+              <div id="model-rec-cards"></div>
+            </div>
+            <div class="setup-card" style="margin-top:1rem;background:rgba(0,229,255,0.04);border-color:rgba(0,229,255,0.12);">
+              <div class="admin-section-title" style="margin-bottom:0.5rem;">📋 Per-Task Model Assignments</div>
+              <div id="task-model-list" style="display:grid;gap:0.4rem;"></div>
+            </div>
+          </div>
+        </div>
+        <div class="wizard-actions">
+          <button class="btn btn-ghost" id="step2-back">← Back</button>
+          <button class="btn btn-primary" id="step2-continue">Continue →</button>
+        </div>
+      </div>
+
+      <!-- Step 3: API Keys -->
+      <div class="wizard-step" id="step-3">
+        <div class="setup-card">
+          <div class="admin-section-title">🔑 API Fallback Configuration</div>
+          <p class="text-secondary" style="font-size:0.85rem;margin-bottom:1rem;">
+            Optional: set an API provider as fallback when local models can't handle a task.
+            Leave blank to use local models only.
+          </p>
+          <div class="env-grid">
+            <div class="env-row">
+              <label>OPENAI_API_KEY</label>
+              <input type="password" id="env-openai-key" placeholder="sk-..." autocomplete="off">
+            </div>
+            <div class="env-row">
+              <label>OPENAI_BASE_URL</label>
+              <input type="text" id="env-openai-base" placeholder="https://api.openai.com/v1">
+            </div>
+            <div class="env-row">
+              <label>FALLBACK_API_MODEL</label>
+              <input type="text" id="env-fallback-model" placeholder="gpt-4o-mini">
+            </div>
+          </div>
+          <div style="margin-top:1rem;font-size:0.75rem;color:var(--text-secondary);">
+            <span id="api-key-status"></span>
+            <button class="btn btn-ghost btn-xs" id="test-api-key-btn" style="margin-left:0.5rem;">Test Key</button>
+          </div>
+        </div>
+        <div class="wizard-actions">
+          <button class="btn btn-ghost" id="step3-back">← Back</button>
+          <button class="btn btn-primary" id="step3-skip">Skip →</button>
+        </div>
+      </div>
+
+      <!-- Step 4: Social Platforms -->
+      <div class="wizard-step" id="step-4">
+        <div class="setup-card" id="setup-youtube">
+          <div class="admin-section-title">🎬 YouTube Setup</div>
+          <ol class="setup-steps">
+            <li>Go to <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a></li>
+            <li>Create a new project or select existing</li>
+            <li>Enable <strong>YouTube Data API v3</strong></li>
+            <li>Go to <strong>Credentials</strong> → <strong>Create Credentials</strong> → <strong>OAuth 2.0 Client ID</strong></li>
+            <li>Application type: <strong>Web application</strong></li>
+            <li>Add redirect URI: <code>https://developers.google.com/oauthplayground</code></li>
+            <li>Copy <strong>Client ID</strong> and <strong>Client Secret</strong> to your <code>.env</code> file</li>
+            <li>Go to <a href="https://developers.google.com/oauthplayground" target="_blank">OAuth Playground</a></li>
+            <li>Click gear icon → check <strong>"Use your own OAuth credentials"</strong> → paste Client ID and Secret</li>
+            <li>In scopes, enter: <code>https://www.googleapis.com/auth/youtube.upload</code> → <strong>Authorize APIs</strong></li>
+            <li>Click <strong>Exchange authorization code for tokens</strong></li>
+            <li>Copy the <strong>Refresh token</strong> — paste it as <code>SYSTEM_YOUTUBE_REFRESH_TOKEN</code> in <code>.env</code></li>
+          </ol>
+          <div class="setup-status" style="margin-top:0.75rem;">
+            <span class="badge badge-info">YouTube client configured: <span id="youtube-status">check .env</span></span>
+          </div>
+        </div>
+        <div class="setup-card" id="setup-tiktok">
+          <div class="admin-section-title">📱 TikTok Setup</div>
+          <ol class="setup-steps">
+            <li>Go to <a href="https://developers.tiktok.com/" target="_blank">TikTok Developer Portal</a></li>
+            <li>Create a new app with <strong>Login Kit</strong> and <strong>Content Posting</strong> permissions</li>
+            <li>Add redirect URI: <code>https://your-domain.com/api/v1/oauth/tiktok/callback</code></li>
+            <li>Copy <strong>Client Key</strong> and <strong>Client Secret</strong> to <code>.env</code></li>
+            <li>After OAuth flow, you'll get an access token and refresh token</li>
+            <li>Set <code>SYSTEM_TIKTOK_ACCESS_TOKEN</code> and <code>SYSTEM_TIKTOK_REFRESH_TOKEN</code> in <code>.env</code></li>
+            <li><strong>Required:</strong> Set <code>PUBLIC_BASE_URL</code> to your server's public URL</li>
+          </ol>
+          <div class="setup-status" style="margin-top:0.75rem;">
+            <span class="badge badge-warn">Requires TikTok developer account</span>
+          </div>
+        </div>
+        <div class="setup-card" id="setup-instagram">
+          <div class="admin-section-title">📸 Instagram Setup</div>
+          <ol class="setup-steps">
+            <li>Go to <a href="https://developers.facebook.com/" target="_blank">Facebook Developers</a></li>
+            <li>Create a new app with <strong>Instagram Graph API</strong></li>
+            <li>Convert your Instagram account to a <strong>Business/Creator account</strong></li>
+            <li>Connect your Instagram account in the Facebook App dashboard</li>
+            <li>Generate a <strong>User Access Token</strong> with <code>instagram_basic, instagram_content_publish</code> scopes</li>
+            <li>Paste the token as <code>SYSTEM_INSTAGRAM_ACCESS_TOKEN</code> in <code>.env</code></li>
+            <li>Find your Instagram User ID and set <code>SYSTEM_INSTAGRAM_USER_ID</code></li>
+          </ol>
+        </div>
+        <div class="setup-card" id="setup-x">
+          <div class="admin-section-title">🐦 X/Twitter Setup</div>
+          <ol class="setup-steps">
+            <li>Go to <a href="https://developer.twitter.com/" target="_blank">Twitter Developer Portal</a></li>
+            <li>Create a new project and app with <strong>OAuth 2.0</strong></li>
+            <li>Enable <strong>Read and Write</strong> permissions</li>
+            <li>Copy <strong>Client ID</strong> and <strong>Client Secret</strong> to <code>.env</code></li>
+            <li>Generate a token with <code>tweet.read tweet.write users.read offline.access</code> scopes</li>
+            <li>Set <code>SYSTEM_TWITTER_ACCESS_TOKEN</code> in <code>.env</code></li>
+          </ol>
+        </div>
+        <div class="wizard-actions">
+          <button class="btn btn-ghost" id="step4-back">← Back</button>
+          <button class="btn btn-primary" id="step4-continue">Continue →</button>
+        </div>
+      </div>
+
+      <!-- Step 5: Finish -->
+      <div class="wizard-step" id="step-5">
+        <div class="setup-card" style="text-align:center;padding:2rem;">
+          <div style="font-size:3rem;margin-bottom:0.75rem;">🚀</div>
+          <h2 class="section-title" style="font-size:1.3rem;">All Set!</h2>
+          <p class="text-secondary" style="margin-bottom:1.5rem;">
+            Your system is configured and ready to generate content.
+          </p>
+          <div style="display:grid;gap:0.5rem;max-width:400px;margin:0 auto;">
+            <div style="display:flex;justify-content:space-between;padding:0.5rem 1rem;background:rgba(255,255,255,0.03);border-radius:6px;font-size:0.85rem;">
+              <span>Hardware detected</span>
+              <span id="finish-hw" class="badge-ok" style="padding:0.15rem 0.6rem;border-radius:999px;font-size:0.65rem;">✓</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:0.5rem 1rem;background:rgba(255,255,255,0.03);border-radius:6px;font-size:0.85rem;">
+              <span>Models assigned</span>
+              <span id="finish-models" class="badge-ok" style="padding:0.15rem 0.6rem;border-radius:999px;font-size:0.65rem;">✓</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:0.5rem 1rem;background:rgba(255,255,255,0.03);border-radius:6px;font-size:0.85rem;">
+              <span>API key (optional)</span>
+              <span id="finish-api" class="pill-ok" style="padding:0.15rem 0.6rem;border-radius:999px;font-size:0.65rem;">Skipped</span>
+            </div>
+          </div>
+          <div style="margin-top:1.5rem;display:flex;gap:0.75rem;justify-content:center;flex-wrap:wrap;">
+            <a href="brainrot.html" class="btn btn-primary">Generate Your First Brain Rot</a>
+            <a href="index.html" class="btn btn-ghost">Go to Dashboard</a>
+          </div>
+        </div>
+        <div class="wizard-actions">
+          <button class="btn btn-ghost" id="step5-back">← Back</button>
+          <span></span>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <div id="toast-container" aria-live="polite"></div>
+  <script src="i18n.js"></script>
+  <script src="api.js"></script>
+  <script defer src="particles.js"></script>
+  <script defer src="ui.js"></script>
+  <script >
+    function _t(k, f) { return (typeof __ === 'function' ? __(k, f) : f); }
+    // ── Wizard State ──
+    let currentStep = 1;
+    let wizardData = {};
+
+    function goStep(n) {
+      document.querySelectorAll('.wizard-step').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.step-dot').forEach(el => el.classList.remove('active'));
+      document.getElementById(`step-${n}`).classList.add('active');
+      document.querySelector(`.step-dot[data-step="${n}"]`).classList.add('active');
+      currentStep = n;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function markStepDone(n) {
+      document.querySelector(`.step-dot[data-step="${n}"]`).classList.add('done');
+    }
+
+    function tierClass(tier) {
+      const map = { edge: 'model-tag-t0', light: 'model-tag-t1', medium: 'model-tag-t2', heavy: 'model-tag-t3' };
+      return map[tier] || 'model-tag-t0';
+    }
+
+    function tierLabel(tier) {
+      const map = { edge: _t('setup.tier-edge', 'edge'), light: _t('setup.tier-light', 'light'), medium: _t('setup.tier-medium', 'medium'), heavy: _t('setup.tier-heavy', 'heavy') };
+      return map[tier] || tier;
+    }
+
+    // ── Step 1: Hardware Detection ──
+    async function detectHardware() {
+      try {
+        const data = await apiJSON('/system/recommendation');
+        wizardData.hardware = data.hardware;
+        wizardData.recommendation = data.recommendation;
+        wizardData.installedModels = data.installed_models;
+        wizardData.taskRecs = data.task_recommendations;
+        wizardData.setupStatus = data.setup_status;
+
+        document.getElementById('hw-detection-status').style.display = 'none';
+        document.getElementById('hw-results').style.display = 'block';
+
+        const hw = data.hardware;
+        document.getElementById('hw-ram').textContent = _t('setup.ram-total', `${hw.ram_total_gb} GB total`);
+        document.getElementById('hw-ram').textContent += _t('setup.ram-free', ` · ${hw.ram_available_gb} GB free`);
+        document.getElementById('hw-ram-tier').textContent = _t('setup.ram-tier', `Tier: ${tierLabel(hw.ram_tier)}`);
+
+        document.getElementById('hw-cpu').textContent = hw.cpu_model || hw.cpu?.model || _t('common.unknown', 'Unknown');
+        document.getElementById('hw-cpu-cores').textContent = _t('setup.cpu-cores', `${hw.cpu_physical_cores || hw.cpu?.cores_physical || '?'} physical / ${hw.cpu_logical_cores || hw.cpu?.cores_logical || '?'} logical cores`);
+
+        if (hw.is_apple_silicon) {
+          document.getElementById('hw-silicon').textContent = hw.silicon || _t('setup.apple-silicon', 'Apple Silicon');
+        } else {
+          document.getElementById('hw-silicon').textContent = hw.gpu_model || _t('setup.no-gpu', 'No GPU detected');
+        }
+        document.getElementById('hw-gpu').textContent = hw.gpu_detail || '';
+
+        document.getElementById('hw-platform').textContent = hw.platform || _t('common.unknown', 'Unknown');
+        document.getElementById('hw-sys-extra').textContent = _t('setup.python-version', `Python ${hw.python_version || ''}`);
+
+        const oll = hw.ollama || {};
+        const ollStatus = document.getElementById('hw-ollama');
+        if (oll.installed) {
+          if (oll.running) {
+            ollStatus.innerHTML = '<span class="pill-ok" style="padding:0.15rem 0.6rem;border-radius:999px;font-size:0.65rem;">' + _t('setup.ollama-running', '● Running') + '</span>';
+          } else {
+            ollStatus.innerHTML = '<span class="pill-warn" style="padding:0.15rem 0.6rem;border-radius:999px;font-size:0.65rem;">' + _t('setup.ollama-not-running', 'Installed but not running') + '</span>';
+          }
+        } else {
+          ollStatus.innerHTML = '<span class="pill-missing" style="padding:0.15rem 0.6rem;border-radius:999px;font-size:0.65rem;">' + _t('setup.ollama-not-installed', 'Not installed') + '</span>';
+        }
+        document.getElementById('hw-ollama-models').textContent = (oll.models || []).map(m => m.name).join(', ') || _t('setup.no-models', 'No models');
+
+        const ff = document.getElementById('hw-ffmpeg');
+        if (hw.ffmpeg_installed) {
+          ff.innerHTML = '<span class="pill-ok" style="padding:0.15rem 0.6rem;border-radius:999px;font-size:0.65rem;">' + _t('setup.ffmpeg-installed', '✓ Installed') + '</span>';
+        } else {
+          ff.innerHTML = '<span class="pill-missing" style="padding:0.15rem 0.6rem;border-radius:999px;font-size:0.65rem;">' + _t('setup.ffmpeg-not-found', 'Not found') + '</span>';
+        }
+
+        markStepDone(1);
+      } catch (err) {
+        document.getElementById('hw-detection-status').innerHTML =
+          `<p style="color:var(--red);">${_t('setup.detection-failed', 'Detection failed')}: ${escHtml(err.message)}</p>
+           <button class="btn btn-ghost btn-sm retry-hw-btn" style="margin-top:0.5rem;">${_t('common.retry', 'Retry')}</button>`;
+      }
+    }
+
+    // ── Step 2: Render Model Recommendations ──
+    function renderModelRecs() {
+      document.getElementById('model-rec-status').style.display = 'none';
+      document.getElementById('model-rec-results').style.display = 'block';
+
+      const recs = wizardData.recommendation || {};
+      const models = recs.models || [];
+      const cardsEl = document.getElementById('model-rec-cards');
+      cardsEl.innerHTML = '';
+
+      models.forEach(m => {
+        const tier = m.tier || 'unknown';
+        const installed = m.installed;
+        const card = document.createElement('div');
+        card.className = 'rec-card';
+        card.innerHTML = `
+          <h4>
+            <span class="model-name">${m.name}</span>
+            <span class="model-tag ${tierClass(tier)}">${tierLabel(tier)}</span>
+            ${installed ? '<span class="model-tag model-tag-installed" style="background:rgba(34,197,94,0.1);color:var(--green);font-size:0.55rem;padding:0.1rem 0.4rem;border-radius:999px;">✓</span>' : ''}
+          </h4>
+          <div class="rec-detail">${m.description || ''}</div>
+          <div class="rec-detail" style="margin-top:0.25rem;">
+            ${m.recommended_ram ? `${_t('setup.ram-label', 'RAM')}: ≥${m.recommended_ram}GB · ` : ''}
+            ${m.context_window ? `${_t('setup.context-label', 'Context')}: ${(m.context_window/1024).toFixed(0)}K · ` : ''}
+            ${m.multilingual ? `${_t('setup.multilingual-label', '🌐 Multilingual')} · ` : ''}
+            ${m.description || ''}
+          </div>
+        `;
+        cardsEl.appendChild(card);
+      });
+
+      // Task assignments
+      const taskRecs = wizardData.taskRecs || {};
+      const taskList = document.getElementById('task-model-list');
+      taskList.innerHTML = '';
+      const taskLabels = {
+        strategist: _t('setup.task-strategist', 'Strategist (hook/clip selection)'),
+        analyst: _t('setup.task-analyst', 'Analyst (performance analysis)'),
+        caption_style: _t('setup.task-caption-style', 'Caption Styling'),
+        virality: _t('setup.task-virality', 'Virality Scoring'),
+        translation: _t('setup.task-translation', 'Translation'),
+        thumbnails: _t('setup.task-thumbnails', 'Thumbnails'),
+        chat: _t('setup.task-chat', 'Chat / Assistant'),
+      };
+      Object.entries(taskRecs).forEach(([task, rec]) => {
+        const label = taskLabels[task] || task;
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:0.35rem 0.5rem;border-radius:4px;background:rgba(255,255,255,0.02);font-size:0.8rem;';
+        row.innerHTML = `
+          <span style="color:var(--text-secondary);">${label}</span>
+          <span>
+            <span style="color:var(--cyan);font-weight:600;">${rec.model || rec.clean_name || '—'}</span>
+            <span class="model-tag ${tierClass(rec.tier)}" style="margin-left:0.4rem;">${rec.tier || '?'}</span>
+            ${rec.upgrade_suggestion ? `<span style="color:var(--amber);font-size:0.65rem;margin-left:0.3rem;">↑ ${rec.upgrade_suggestion}</span>` : ''}
+          </span>
+        `;
+        taskList.appendChild(row);
+      });
+
+      markStepDone(2);
+    }
+
+    // ── Step 3: API Keys ──
+    async function testApiKey() {
+      const key = document.getElementById('env-openai-key').value.trim();
+      if (!key) {
+        document.getElementById('api-key-status').textContent = _t('setup.no-key', 'No key entered.');
+        return;
+      }
+      try {
+        const res = await fetch('https://api.openai.com/v1/models', {
+          headers: { 'Authorization': `Bearer ${key}` },
+        });
+        if (res.ok) {
+          document.getElementById('api-key-status').innerHTML = '<span class="pill-ok" style="padding:0.15rem 0.6rem;border-radius:999px;font-size:0.65rem;">' + _t('setup.key-valid', '✓ Key is valid') + '</span>';
+        } else {
+          document.getElementById('api-key-status').innerHTML = '<span class="pill-missing" style="padding:0.15rem 0.6rem;border-radius:999px;font-size:0.65rem;">' + _t('setup.key-rejected', '✗ Key rejected') + '</span>';
+        }
+      } catch (err) {
+        console.warn('API key check failed:', err);
+        document.getElementById('api-key-status').innerHTML = '<span class="pill-warn" style="padding:0.15rem 0.6rem;border-radius:999px;font-size:0.65rem;">' + _t('setup.key-unreachable', '⚠ Could not reach API') + '</span>';
+      }
+    }
+
+    function getApiKeyState() {
+      const key = document.getElementById('env-openai-key').value.trim();
+      return key ? _t('setup.configured', 'Configured') : _t('setup.skipped', 'Skipped');
+    }
+
+    // ── Step 5: Finish ──
+    function renderFinish() {
+      document.getElementById('finish-hw').textContent = _t('setup.finish-hw', `✓ ${wizardData.hardware?.ram_total_gb || '?'}GB RAM`);
+      document.getElementById('finish-models').textContent = _t('setup.assigned-per-task', '✓ Assigned per task');
+      const apiState = getApiKeyState();
+      const apiEl = document.getElementById('finish-api');
+      apiEl.textContent = apiState;
+      apiEl.className = apiState === 'Configured' ? 'pill-ok' : 'pill-warn';
+      apiEl.style.cssText += 'padding:0.15rem 0.6rem;border-radius:999px;font-size:0.65rem;';
+      markStepDone(5);
+      // Mark setup complete on the backend
+      apiJSON('/system/setup-complete', {
+        method: 'POST',
+        body: JSON.stringify({ setup_wizard_complete: true }),
+        headers: { 'Content-Type': 'application/json' },
+      }).catch(() => {});  // non-critical, don't block the UI
+    }
+
+    // Bind step navigation buttons
+    document.querySelectorAll('.wizard-actions .btn-primary, .wizard-actions .btn-ghost').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const id = this.id;
+        if (id === 'step1-continue') goStep(2);
+        else if (id === 'step2-back') goStep(1);
+        else if (id === 'step2-continue') goStep(3);
+        else if (id === 'step3-back') goStep(2);
+        else if (id === 'step3-skip') goStep(4);
+        else if (id === 'step4-back') goStep(3);
+        else if (id === 'step4-continue') goStep(5);
+        else if (id === 'step5-back') goStep(4);
+      });
+    });
+    document.getElementById('test-api-key-btn')?.addEventListener('click', testApiKey);
+
+    // Delegate retry click for HW detection
+    document.getElementById('hw-detection-status')?.addEventListener('click', e => {
+      if (e.target.closest('.retry-hw-btn')) detectHardware();
+    });
+
+    // ── Init ──
+    detectHardware();
+
+    let recsRendered = false;
+    const stepObserver = new MutationObserver(() => {
+      if (currentStep === 2 && !recsRendered && wizardData.recommendation) {
+        renderModelRecs();
+        recsRendered = true;
+      }
+      if (currentStep === 5) {
+        renderFinish();
+      }
+    });
+    document.querySelectorAll('.wizard-step').forEach(el => {
+      stepObserver.observe(el, { attributes: true, attributeFilter: ['class'] });
+    });
+
+    // Also handle direct step navigation
+    const origGoStep = goStep;
+    goStep = function(n) {
+      origGoStep(n);
+      if (n === 2 && wizardData.recommendation) {
+        renderModelRecs();
+        recsRendered = true;
+      }
+      if (n === 5) {
+        renderFinish();
+      }
+    };
+  </script>
+</body>
+</html>

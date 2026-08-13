@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en" data-i18n>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="You are offline. Check your connection and try again.">
+  <meta property="og:title" content="Offline — Nexus-UGC">
+  <meta property="og:description" content="You are offline. Check your connection and try again.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>N</text></svg>">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="choko.css">
+  <title>Offline — Nexus-UGC</title>
+  <meta name="theme-color" content="#0a0e17">
+  <style >
+    body { display:flex; align-items:center; justify-content:center; min-height:100dvh; margin:0; padding:1rem; }
+    .offline-card { text-align:center; max-width:400px; }
+    .offline-icon { font-size:4rem; margin-bottom:1rem; display:block; }
+    .retry-btn { margin-top:1rem; }
+  </style>
+</head>
+<body>
+  <a href="#main-content" class="skip-to-content" data-i18n="common.skip-to-content">Skip to content</a>
+  <main id="main-content"><div class="glass-card offline-card">
+    <span class="offline-icon">📡</span>
+    <h2 data-i18n="offline.title">No Connection</h2>
+    <p class="text-dim" style="margin-bottom:0.5rem;" data-i18n="offline.message">You appear to be offline. Check your internet connection and try again.</p>
+    <button class="btn btn-primary retry-btn" id="retry-btn" data-i18n="offline.retry">Retry</button>
+    <script >document.getElementById('retry-btn')?.addEventListener('click', () => location.reload());</script>
+    <script src="i18n.js"></script>
+  </div></main>
+</body>
+</html>

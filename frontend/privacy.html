@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en" data-i18n>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Privacy policy for Nexus-UGC. Learn how we handle your data, AI processing, and account information.">
+  <meta property="og:title" content="Privacy Policy — Nexus-UGC">
+  <meta property="og:description" content="Privacy policy for Nexus-UGC. Learn how we handle your data, AI processing, and account information.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>N</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <title>Privacy Policy — Nexus-UGC</title>
+  <link rel="stylesheet" href="style.css">
+  <meta name="theme-color" content="#0a0e17">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-192.svg">
+</head>
+<body>
+  <a href="#main-content" class="skip-to-content" data-i18n="common.skip-to-content">Skip to content</a>
+  <canvas id="particle-canvas"></canvas>
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <div class="brand-icon">N</div>
+      <a href="index.html"><span>Nexus<span class="gradient-text">UGC</span></span></a>
+    </div>
+    <div class="navbar-actions">
+      <span class="user-email" id="user-email"></span>
+      <button class="btn btn-ghost btn-sm" id="login-btn" data-i18n="common.sign-in">Sign In</button>
+      <button class="btn btn-ghost btn-sm hidden" id="logout-btn" data-i18n="common.logout">Logout</button>
+    </div>
+  </nav>
+  <main id="main-content"><div style="max-width:800px;margin:6rem auto 2rem;padding:0 2rem;">
+    <h1 style="font-size:2rem;font-weight:800;margin-bottom:0.5rem;">Privacy <span class="gradient-text">Policy</span></h1>
+    <p class="text-dim" style="margin-bottom:2rem;">Last updated: June 2026</p>
+    <div style="line-height:1.8;font-size:0.95rem;">
+      <h2 style="margin:2rem 0 0.5rem;font-size:1.25rem;">1. Information We Collect</h2>
+      <p>We collect your email address, display name, and account credentials when you register. Video files you upload are stored locally on your machine or your configured storage.</p>
+      <h2 style="margin:2rem 0 0.5rem;font-size:1.25rem;">2. How We Use Your Information</h2>
+      <p>Your email is used for account-related communications (receipts, password resets, service notifications). We do not sell or share your personal data with third parties.</p>
+      <h2 style="margin:2rem 0 0.5rem;font-size:1.25rem;">3. Local Processing</h2>
+      <p>All video processing happens locally on your machine using local AI models. Your video content is never uploaded to external servers for processing.</p>
+      <h2 style="margin:2rem 0 0.5rem;font-size:1.25rem;">4. Third-Party Services</h2>
+      <p>When you choose to publish to social platforms, content is sent directly to those platforms via their APIs. Stripe handles payment processing — we never store your payment details.</p>
+      <h2 style="margin:2rem 0 0.5rem;font-size:1.25rem;">5. Data Retention</h2>
+      <p>Your account data is retained until you delete your account. You may request deletion at any time by contacting support.</p>
+      <h2 style="margin:2rem 0 0.5rem;font-size:1.25rem;">6. Security</h2>
+      <p>We use encryption for data in transit (HTTPS) and at rest (encrypted OAuth tokens). Passwords are hashed with PBKDF2-SHA256.</p>
+      <h2 style="margin:2rem 0 0.5rem;font-size:1.25rem;">7. Contact</h2>
+      <p>For privacy inquiries: <a href="mailto:support@nexusugc.com">support@nexusugc.com</a>.</p>
+    </div>
+  </div></main>
+  <script src="i18n.js"></script>
+  <script src="api.js"></script>
+  <script defer src="ui.js"></script>
+</body>
+</html>

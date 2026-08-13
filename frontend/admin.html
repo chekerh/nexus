@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en" data-i18n data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>N</text></svg>">
+  <meta name="description" content="Nexus-UGC admin panel. System monitoring, user management, and platform administration tools.">
+  <meta property="og:title" content="Admin — Nexus-UGC">
+  <meta property="og:description" content="Nexus-UGC admin panel. System monitoring, user management, and platform administration tools.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <title>Admin — Nexus-UGC</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="admin.css">
+  <script >
+    (function() {
+      const t = localStorage.getItem('nexus-theme');
+      if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+  <meta name="theme-color" content="#0a0e17">
+  <meta name="robots" content="noindex">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-192.svg">
+</head>
+<body>
+  <a href="#main-content" class="skip-to-content" data-i18n="common.skip-to-content">Skip to content</a>
+  <noscript><div style="position:fixed;inset:0;z-index:9999;background:#05080f;color:#94a3b8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:2rem;text-align:center"><h1 style="color:#fff;font-size:1.5rem;margin:0">JavaScript Required</h1><p>Nexus-UGC requires JavaScript. Please enable it in your browser settings.</p></div></noscript>
+  <button class="admin-toggle-btn" id="admin-toggle-btn" aria-label="Toggle sidebar">☰</button>
+  <div class="admin-shell" id="admin-shell">
+    <aside class="admin-sidebar" id="admin-sidebar">
+      <div class="admin-sidebar-brand">
+        <div class="admin-sidebar-brand-icon">🔐</div>
+        <div>
+          <div style="font-size:0.8rem;font-weight:700;">Nexus<span class="gradient-text">UGC</span></div>
+          <div style="font-size:0.6rem;color:var(--text-dim);">Admin Panel</div>
+        </div>
+      </div>
+      <nav class="admin-sidebar-nav" id="sidebar-nav"></nav>
+      <div class="admin-sidebar-footer">
+        <button class="admin-nav-item" id="admin-back-btn">
+          <span class="admin-nav-icon">←</span> <span class="nav-label">Back to App</span>
+        </button>
+        <button class="admin-nav-item" id="admin-theme-btn">
+          <span class="admin-nav-icon" id="theme-icon">🌙</span> <span class="nav-label" id="theme-label">Light</span>
+        </button>
+        <button class="admin-nav-item" id="admin-logout-btn">
+          <span class="admin-nav-icon">🚪</span> <span class="nav-label">Sign Out</span>
+        </button>
+      </div>
+    </aside>
+
+    <main class="admin-main" id="main-content">
+      <div id="admin-content"></div>
+    </main>
+  </div>
+
+  <div id="toast-container" aria-live="polite"></div>
+  <script src="i18n.js"></script>
+  <script src="api.js"></script>
+  <script defer src="particles.js"></script>
+  <script defer src="ui.js"></script>
+  <script defer src="admin.js"></script>
+</body>
+</html>

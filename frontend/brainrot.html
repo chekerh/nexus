@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en" data-i18n>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>N</text></svg>">
+  <meta name="description" content="Create AI-generated viral shorts from long-form video. Turn any video into brain rot clips with captions and hooks.">
+  <meta property="og:title" content="Brain Rot — Nexus-UGC">
+  <meta property="og:description" content="Create AI-generated viral shorts from long-form video. Turn any video into brain rot clips with captions and hooks.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <title>Brain Rot — Nexus-UGC</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="choko.css">
+  <meta name="theme-color" content="#0a0e17">
+  <meta name="robots" content="noindex">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-192.svg">
+</head>
+<body>
+  <a href="#main-content" class="skip-to-content" data-i18n="common.skip-to-content">Skip to content</a>
+  <noscript><div style="position:fixed;inset:0;z-index:9999;background:#05080f;color:#94a3b8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:2rem;text-align:center"><h1 style="color:#fff;font-size:1.5rem;margin:0">JavaScript Required</h1><p>Nexus-UGC requires JavaScript. Please enable it in your browser settings.</p></div></noscript>
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <div class="brand-icon">N</div>
+      <a href="index.html"><span>Nexus<span class="gradient-text">UGC</span></span></a>
+    </div>
+    <button class="mobile-nav-toggle" aria-label="Toggle navigation">☰</button>
+    <div class="navbar-actions">
+      <span class="user-email" id="user-email"></span>
+      <button class="btn btn-ghost btn-sm" id="login-btn" data-i18n="common.sign-in">Sign In</button>
+      <button class="btn btn-ghost btn-sm hidden" id="logout-btn" data-i18n="common.logout">Logout</button>
+    </div>
+  </nav>
+
+  <div class="app-layout">
+    <aside class="sidebar">
+      <nav class="sidebar-nav">
+        <a href="index.html">📊 <span class="nav-label" data-i18n="nav.dashboard">Dashboard</span></a>
+        <a href="#" class="active">🧠 <span class="nav-label" data-i18n="nav.brainrot">Brain Rot</span></a>
+        <a href="queue.html">📋 <span class="nav-label" data-i18n="nav.queue">Post Queue</span></a>
+        <a href="templates.html">📋 <span class="nav-label" data-i18n="nav.templates">Templates</span></a>
+        <a href="calendar.html">📅 <span class="nav-label" data-i18n="nav.calendar">Calendar</span></a>
+        <a href="personas.html">👤 <span class="nav-label" data-i18n="nav.personas">Personas</span></a>
+        <a href="campaigns.html">🎯 <span class="nav-label" data-i18n="nav.campaigns">Campaigns</span></a>
+        <div class="sidebar-divider"></div>
+        <a href="accounts.html">🔗 <span class="nav-label" data-i18n="nav.accounts">Accounts</span></a>
+        <a href="setup.html">⚙️ <span class="nav-label" data-i18n="nav.setup">Setup</span></a>
+        <div class="sidebar-divider"></div>
+        <a href="billing.html">💳 <span class="nav-label" data-i18n="nav.billing">Billing</span></a>
+        <a href="settings.html">⚙️ <span class="nav-label" data-i18n="nav.settings">Settings</span></a>
+        <a href="admin-login.html">🔐 <span class="nav-label" data-i18n="nav.admin">Admin</span></a>
+      </nav>
+    </aside>
+
+    <main class="main-area" id="main-content">
+      <div class="page-header">
+        <div>
+          <h1 data-i18n="brainrot.page-title">Brain Rot <span class="gradient-text">Generator</span></h1>
+          <p data-i18n="brainrot.page-subtitle">Generate viral Shorts in one click — AI writes the script, adds captions, and publishes.</p>
+        </div>
+      </div>
+
+      <!-- Generator Form -->
+      <div class="content-card">
+        <h3 style="margin:0 0 0.75rem;font-size:0.9rem;" data-i18n="brainrot.create-section">🎬 Create a Short</h3>
+        <div class="two-col">
+          <div>
+            <div class="form-group">
+              <label data-i18n="brainrot.niche-label">Niche</label>
+              <select id="br-niche" class="form-input">
+                <option value="drama">Drama</option>
+                <option value="gaming">Gaming</option>
+                <option value="fake_life_stories">Fake Life Stories</option>
+                <option value="motivation">Motivation</option>
+                <option value="money">Money / Hustle</option>
+                <option value="facts">Mind-Blowing Facts</option>
+              </select>
+            </div>
+    <div class="form-group">
+      <label data-i18n="brainrot.style-label">Caption Style <span class="text-dim text-xs" id="br-style-count"></span></label>
+      <div class="style-selector-grid" id="br-style-grid">
+        <div class="style-card selected" data-style="brain_rot" tabindex="0" role="button" aria-label="Select Brain Rot style">
+          <div class="style-preview brain-rot-preview">Aa</div>
+          <div class="style-label">Brain Rot</div>
+        </div>
+        <div class="style-card" data-style="hype" tabindex="0" role="button" aria-label="Select Hype style">
+          <div class="style-preview hype-preview">Aa</div>
+          <div class="style-label">Hype</div>
+        </div>
+        <div class="style-card" data-style="clean" tabindex="0" role="button" aria-label="Select Clean style">
+          <div class="style-preview clean-preview">Aa</div>
+          <div class="style-label">Clean</div>
+        </div>
+      </div>
+      <input type="hidden" id="br-style" value="brain_rot">
+      <p class="text-dim text-xs" id="br-style-desc" style="margin-top:4px;">Bold Impact font, white with heavy black border — classic TikTok style</p>
+      <div id="br-style-preview" class="style-preview-panel" style="display:none;">
+        <div class="preview-viewport" id="preview-viewport">
+          <div class="preview-caption" id="preview-caption-line1">This is your caption</div>
+          <div class="preview-caption" id="preview-caption-line2">preview ✨</div>
+        </div>
+        <div class="preview-meta">
+          <span class="preview-animation-badge" id="preview-animation-badge"></span>
+          <span class="preview-position-badge" id="preview-position-badge"></span>
+        </div>
+      </div>
+    </div>
+    <style >
+      .style-selector-grid { display:flex; flex-wrap:wrap; gap:0.5rem; margin-top:0.25rem; }
+      .style-card { width:calc(33.33% - 0.35rem); min-width:80px; background:rgba(148,163,184,0.04); border:2px solid transparent; border-radius:8px; padding:0.5rem; cursor:pointer; text-align:center; transition:all 0.2s; }
+      .style-card:hover { background:rgba(148,163,184,0.08); }
+      .style-card.selected { border-color:var(--cyan); background:rgba(0,229,255,0.06); }
+      .style-preview { font-size:1.1rem; font-weight:700; padding:0.4rem 0; border-radius:4px; letter-spacing:1px; }
+      .brain-rot-preview { font-family:Impact,sans-serif; color:white; -webkit-text-stroke:1.5px black; text-shadow:none; }
+      .hype-preview { font-family:Arial-Bold,sans-serif; color:#ffdd00; -webkit-text-stroke:1px #cc2200; }
+      .clean-preview { font-family:Helvetica,sans-serif; color:white; -webkit-text-stroke:0.5px #666; }
+      .style-label { font-size:0.65rem; color:var(--text-dim); margin-top:0.15rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .style-preview-panel { margin-top:0.5rem; background:#0a0e17; border:1px solid var(--glass-border); border-radius:var(--radius-md); overflow:hidden; }
+      .preview-viewport { position:relative; min-height:80px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; padding:1rem; background:linear-gradient(135deg,#0d1117,#161b22); }
+      .preview-caption { font-size:1.3rem; font-weight:700; line-height:1.3; text-align:center; padding:2px 8px; border-radius:2px; max-width:100%; word-break:break-word; }
+      .preview-meta { display:flex; gap:0.5rem; padding:0.35rem 0.75rem; background:rgba(148,163,184,0.04); border-top:1px solid var(--glass-border); }
+      .preview-animation-badge, .preview-position-badge { font-size:0.6rem; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; padding:0.1rem 0.4rem; border-radius:4px; background:rgba(148,163,184,0.08); color:var(--text-dim); }
+    </style>
+            <div class="form-group">
+              <label data-i18n="brainrot.platform-label">Platform</label>
+              <select id="br-platform" class="form-input">
+                <option value="youtube">YouTube Shorts</option>
+                <option value="tiktok">TikTok</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label data-i18n="brainrot.duration-label">Duration (seconds)</label>
+              <select id="br-duration" class="form-input">
+                <option value="15">15s</option>
+                <option value="30" selected>30s</option>
+                <option value="60">60s</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label data-i18n="brainrot.language-label">Language</label>
+              <select id="br-language" class="form-input">
+                <option value="en">English</option>
+                <option value="es">Spanish</option>
+                <option value="fr">French</option>
+                <option value="de">German</option>
+                <option value="pt">Portuguese</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <div class="form-group">
+              <label data-i18n="brainrot.idea-label">Video Idea (optional)</label>
+              <textarea id="br-idea" class="form-input" rows="3" placeholder="Describe your short idea, or leave blank for AI to generate..."></textarea>
+            </div>
+            <div class="form-group">
+              <label data-i18n="brainrot.title-label">Custom Title (optional)</label>
+              <input type="text" id="br-title" class="form-input" placeholder="Auto-generated from hook">
+            </div>
+            <div class="form-group">
+              <label data-i18n="brainrot.bg-video-label">Background Video (optional)</label>
+              <div class="flex gap-1 items-center">
+                <input type="file" id="br-bg-file" class="form-input" accept="video/mp4,video/quicktime,video/x-msvideo,video/webm" style="flex:1;">
+                <button type="button" class="btn btn-xs btn-ghost" id="br-bg-clear" title="Clear background">✕</button>
+              </div>
+              <span class="text-dim text-xs">Upload your own footage or leave blank for AI-generated background</span>
+              <div id="br-bg-status" class="text-xs text-dim" style="margin-top:4px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="br-error" class="text-sm" style="color:var(--red);margin:0.5rem 0;display:none;"></div>
+
+        <div class="flex gap-1 mt-2" style="flex-wrap:wrap;">
+          <button class="btn btn-primary" id="br-generate-btn" data-i18n="brainrot.generate-btn">✍️ Generate Script</button>
+          <button class="btn btn-secondary" id="br-render-btn" disabled data-i18n="brainrot.render-btn">🎬 Render & Publish</button>
+          <button class="btn btn-ghost" id="br-publish-btn" data-i18n="brainrot.publish-btn">🚀 One-Click Publish</button>
+          <button class="btn btn-sm btn-ghost" id="br-save-template-btn" style="margin-top:0.5rem;" title="Save current settings as a reusable template" data-i18n="brainrot.save-template-btn">📋 Save as Template</button>
+        </div>
+      </div>
+
+      <!-- Script Preview -->
+      <div class="content-card" id="br-script-section" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+          <h3 style="margin:0;font-size:0.9rem;">📝 Generated Script</h3>
+          <span id="br-status" style="color:var(--text-dim);font-size:0.8rem;">Ready</span>
+        </div>
+        <div id="br-script-content"></div>
+      </div>
+
+      <!-- Video Preview -->
+      <div class="content-card" id="br-video-section" style="display:none;">
+        <h3 style="margin:0 0 0.75rem;font-size:0.9rem;">🎥 Preview</h3>
+        <div style="max-width:360px;margin:0 auto;">
+          <video id="br-video-player" controls width="100%" style="border-radius:var(--radius-md);"></video>
+        </div>
+      </div>
+
+      <!-- History -->
+      <div class="content-card">
+        <h3 style="margin:0 0 0.75rem;font-size:0.9rem;">📋 Recent Brain Rot Posts</h3>
+        <div id="br-history" style="color:var(--text-dim);font-size:0.875rem;">
+          <p>Generate your first short to see history here.</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Progress Modal -->
+  <div id="progress-modal" class="modal-overlay hidden">
+    <div class="modal-content" style="max-width:520px;">
+      <div class="modal-header">
+        <h3>Pipeline Progress</h3>
+        <button class="modal-close" id="progress-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="pulse-dot" id="progress-pulse"></span>
+          <span class="text-sm" id="progress-stage-label">Initializing...</span>
+          <span class="text-sm text-dim ml-auto" id="progress-pct-label">0%</span>
+        </div>
+        <div class="progress-bar" style="margin-bottom:1rem;">
+          <div class="progress-bar-fill" id="progress-modal-fill"></div>
+        </div>
+        <div id="progress-modal-console" class="thinking-console" style="max-height:300px;overflow-y:auto;">
+          <div class="thinking-line">Waiting for pipeline to start...</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger btn-sm" id="progress-stop-btn">Stop</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <script src="i18n.js"></script>
+  <script src="api.js"></script>
+  <script defer src="particles.js"></script>
+  <script defer src="ui.js"></script>
+  <script >
+    // ── Progress Modal (shared) ──
+    let _progressSource = null;
+    let _progressProcessId = null;
+
+    function showProgressModal(processId) {
+      _progressProcessId = processId;
+      closeProgressModal();
+      const modal = document.getElementById('progress-modal');
+      const console = document.getElementById('progress-modal-console');
+      const fill = document.getElementById('progress-modal-fill');
+      const stageLabel = document.getElementById('progress-stage-label');
+      const pctLabel = document.getElementById('progress-pct-label');
+      if (!modal) return;
+      modal.classList.remove('hidden');
+      modal.querySelector('.modal-content').scrollIntoView({ behavior: 'smooth' });
+      console.innerHTML = '<div class="thinking-line">Connecting to pipeline stream...</div>';
+      fill.style.width = '0%';
+      stageLabel.textContent = 'Connecting...';
+      pctLabel.textContent = '0%';
+
+      _progressSource = connectProgressSSE(processId, {
+        onThought(thought) {
+          const el = document.createElement('div');
+          el.className = 'thinking-line';
+          el.textContent = `> ${thought}`;
+          console.appendChild(el);
+          console.scrollTop = console.scrollHeight;
+        },
+        onStage(stage) {
+          const labels = {
+            initializing: 'Initializing...',
+            drive_download: 'Downloading from Drive...',
+            transcription: 'Transcribing Audio...',
+            translation: 'Translating...',
+            analysis: 'Analyzing Content...',
+            cutting: 'Rendering Clips...',
+            virality_scoring: 'Scoring Clips...',
+            completed: 'Complete!',
+            failed: 'Failed',
+          };
+          stageLabel.textContent = labels[stage] || `Processing (${stage})...`;
+        },
+        onProgress(percent) {
+          fill.style.width = `${percent}%`;
+          pctLabel.textContent = `${percent}%`;
+        },
+        onMessage(msg) {
+          const el = document.createElement('div');
+          el.className = 'thinking-line';
+          el.textContent = `> ${msg}`;
+          console.appendChild(el);
+          console.scrollTop = console.scrollHeight;
+        },
+        onDone(data) {
+          fill.style.width = '100%';
+          pctLabel.textContent = '100%';
+          if (data.status === 'completed') {
+            stageLabel.textContent = '✅ Complete!';
+            const el = document.createElement('div');
+            el.className = 'thinking-line';
+            el.textContent = '> Pipeline completed successfully.';
+            console.appendChild(el);
+            showToast('Pipeline complete!', 'success');
+          } else if (data.status === 'failed') {
+            stageLabel.textContent = '❌ Failed';
+            const el = document.createElement('div');
+            el.className = 'thinking-line error';
+            el.textContent = `> Error: ${data.error || 'Unknown error'}`;
+            console.appendChild(el);
+            showToast(data.error || 'Pipeline failed', 'error');
+          } else if (data.status === 'cancelled') {
+            stageLabel.textContent = '⛔ Cancelled';
+            const el = document.createElement('div');
+            el.className = 'thinking-line';
+            el.textContent = '> Pipeline cancelled by user.';
+            console.appendChild(el);
+          }
+          document.getElementById('progress-pulse')?.classList.remove('pulse-dot');
+          document.getElementById('progress-stop-btn').disabled = true;
+          setTimeout(() => {
+            if (!modal.classList.contains('hidden')) closeProgressModal();
+          }, 3000);
+        },
+        onError() {
+          const el = document.createElement('div');
+          el.className = 'thinking-line error';
+          el.textContent = '> Connection lost. Falling back to polling.';
+          console.appendChild(el);
+        },
+      });
+    }
+
+    function closeProgressModal() {
+      if (_progressSource) {
+        _progressSource.close();
+        _progressSource = null;
+      }
+      _progressProcessId = null;
+      const modal = document.getElementById('progress-modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const modal = document.getElementById('progress-modal');
+      if (modal) {
+        modal.addEventListener('click', function(e) {
+          if (e.target === this) closeProgressModal();
+        });
+      }
+      document.getElementById('progress-close-btn')?.addEventListener('click', closeProgressModal);
+      document.getElementById('progress-stop-btn')?.addEventListener('click', async function() {
+        if (!_progressProcessId) return;
+        this.disabled = true;
+        const origText = this.textContent;
+        try {
+          await apiJSON(`/cancel/${_progressProcessId}`, { method: 'POST' });
+          showToast('Cancelling pipeline...', 'warning');
+        } catch (e) {
+          showToast(e.message || 'Failed to cancel', 'error');
+        } finally {
+          this.disabled = false;
+          this.textContent = origText;
+        }
+      });
+    });
+
+    function $(id) { return document.getElementById(id); }
+
+    let lastScript = null;
+    let lastVideoUrl = null;
+    let lastBgPath = '';
+
+    async function uploadBgVideo() {
+      const fileInput = $('br-bg-file');
+      const file = fileInput?.files?.[0];
+      if (!file) return '';
+
+      const formData = new FormData();
+      formData.append('file', file);
+      $('br-bg-status').textContent = 'Uploading background...';
+
+      try {
+        const token = getToken();
+        const resp = await fetch('/api/v1/brainrot/upload-background', {
+          method: 'POST',
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+          body: formData,
+        });
+        if (!resp.ok) throw new Error(await resp.text());
+        const data = await resp.json();
+        lastBgPath = data.path;
+        $('br-bg-status').textContent = `✅ ${file.name} uploaded`;
+        return data.path;
+      } catch (ex) {
+        $('br-bg-status').textContent = `❌ Upload failed: ${ex.message}`;
+        return '';
+      }
+    }
+
+    function clearBgVideo() {
+      const fi = $('br-bg-file');
+      if (fi) fi.value = '';
+      lastBgPath = '';
+      $('br-bg-status').textContent = '';
+    }
+
+    // ── Brain Rot Logic ──
+
+    function _t(k, f) { return (typeof __ === 'function' ? __(k, f) : f); }
+
+    async function generateScript() {
+      const niche = $('br-niche').value;
+      const style = $('br-style').value;
+      const idea = $('br-idea').value.trim();
+      const err = $('br-error');
+      err.style.display = 'none';
+
+      const btn = $('br-generate-btn');
+      btn.disabled = true;
+      btn.textContent = _t('brainrot.generating', 'Generating...');
+
+      try {
+        const data = await apiJSON('/brainrot/generate', {
+          method: 'POST',
+          body: { niche, idea, caption_style: style, language: $('br-language').value },
+        });
+        lastScript = data;
+
+        // Show script
+        $('br-script-section').style.display = '';
+        $('br-script-content').innerHTML = `
+          <div class="glass-card" style="padding:1rem;margin-bottom:0.75rem;">
+            <div style="font-size:1.1rem;font-weight:700;color:var(--cyan);margin-bottom:0.5rem;">🔥 ${escHtml(data.hook)}</div>
+            <p class="text-sm" style="line-height:1.6;">${escHtml(data.script)}</p>
+          </div>
+          ${(data.caption_cues || []).map((c, i) => `
+            <div class="flex gap-1 items-center text-sm" style="padding:0.25rem 0;">
+              <span class="tier-badge free">${c.time}s</span>
+              <span>${escHtml(c.text)}</span>
+            </div>
+          `).join('')}
+        `;
+        $('br-status').textContent = '✅ Generated';
+        $('br-render-btn').disabled = false;
+        showToast(_t('brainrot.script-ready-toast', 'Review the generated script above'), 'info');
+      } catch (ex) {
+        const errEl = $('br-error');
+        if (errEl) { errEl.textContent = ex.message || 'Generation failed'; errEl.style.display = ''; }
+      } finally {
+        btn.disabled = false;
+        btn.textContent = _t('brainrot.generate-btn', '✍️ Generate Script');
+      }
+    }
+
+    async function renderAndPublish() {
+      if (!lastScript) { await generateScript(); }
+      if (!lastScript) return;
+
+      const errEl = $('br-error');
+      if (errEl) errEl.style.display = 'none';
+      const btn = $('br-render-btn');
+      btn.disabled = true;
+      btn.textContent = _t('brainrot.rendering', 'Rendering...');
+
+      try {
+        // Upload background if selected
+        let bgPath = lastBgPath;
+        if (!bgPath && $('br-bg-file')?.files?.[0]) {
+          bgPath = await uploadBgVideo();
+        }
+
+        const data = await apiJSON('/brainrot/render', {
+          method: 'POST',
+          body: {
+            niche: lastScript.niche,
+            idea: $('br-idea').value.trim(),
+            caption_style: lastScript.caption_style,
+            background_video: bgPath,
+            language: $('br-language').value,
+          },
+        });
+        lastVideoUrl = data.video_url;
+
+        $('br-video-section').style.display = '';
+        const player = $('br-video-player');
+        player.src = data.video_url;
+        player.load();
+        showToast(_t('brainrot.video-ready-toast', 'Preview your brain rot short'), 'info');
+      } catch (ex) {
+        const errEl = $('br-error');
+        if (errEl) { errEl.textContent = ex.message || 'Rendering failed'; errEl.style.display = ''; }
+      } finally {
+        btn.disabled = false;
+        btn.textContent = _t('brainrot.render-btn', '🎬 Render & Publish');
+      }
+    }
+
+    async function oneClickPublish() {
+      if (!isAuthenticated()) { showToast(_t('common.sign-in', 'Sign In'), _t('common.error', 'Login to publish')); return; }
+
+      const btn = $('br-publish-btn');
+      btn.disabled = true;
+      btn.textContent = _t('brainrot.publishing', 'Publishing...');
+
+      try {
+        // Upload background if selected
+        let bgPath = lastBgPath;
+        if (!bgPath && $('br-bg-file')?.files?.[0]) {
+          bgPath = await uploadBgVideo();
+        }
+
+        const data = await apiJSON('/brainrot/publish', {
+          method: 'POST',
+          body: {
+            niche: $('br-niche').value,
+            idea: $('br-idea').value.trim(),
+            caption_style: $('br-style').value,
+            title: $('br-title').value.trim(),
+            platform: $('br-platform').value,
+            background_video: bgPath,
+            language: $('br-language').value,
+          },
+        });
+        lastScript = data.script;
+        lastVideoUrl = data.video_url;
+
+        // Show everything
+        $('br-script-section').style.display = '';
+        $('br-script-content').innerHTML = `
+          <div class="glass-card" style="padding:1rem;margin-bottom:0.75rem;">
+            <div style="font-size:1.1rem;font-weight:700;color:var(--cyan);margin-bottom:0.5rem;">🔥 ${escHtml(data.script?.hook || data.title)}</div>
+            <p class="text-sm" style="line-height:1.6;">${escHtml(data.script?.script || '')}</p>
+          </div>
+        `;
+
+        $('br-video-section').style.display = '';
+        const player = $('br-video-player');
+        player.src = data.video_url;
+        player.load();
+
+        showToast('Published! 🚀', 'Post created: ' + data.title);
+        loadHistory();
+      } catch (err) {
+        $('br-error').textContent = err.message;
+        $('br-error').style.display = '';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = _t('brainrot.publish-btn', '🚀 One-Click Publish');
+      }
+    }
+
+    async function loadHistory() {
+      const historyEl = $('br-history');
+      historyEl.innerHTML = '<div class="loading-pulse" style="text-align:center;padding:1rem;color:var(--text-dim);font-size:0.8rem;">Loading history...</div>';
+      try {
+        const data = await listPosts({ limit: 10 });
+        const posts = data.posts || [];
+        const brPosts = posts.filter(p => p.title && (p.title.includes('Brain') || p.title.includes('brain')));
+        if (brPosts.length === 0) {
+          showEmpty(historyEl, '🧠', 'No Brain Rot Posts Yet', 'Generate your first short to see history here.');
+          return;
+        }
+        $('br-history').innerHTML = brPosts.map(p => `
+          <div class="flex justify-between items-center text-sm" style="padding:0.5rem 0;border-bottom:1px solid rgba(148,163,184,0.06);">
+            <div>
+              <span style="font-weight:500;">${escHtml(p.title)}</span>
+              <span class="text-dim" style="margin-left:0.5rem;">→ ${p.platform}</span>
+            </div>
+            <div>
+              <span class="tier-badge ${p.status}">${p.status}</span>
+              <span class="text-dim text-xs ml-1">${fmtDate(p.created_at)}</span>
+            </div>
+          </div>
+        `).join('');
+      } catch (err) {
+        console.warn('Failed to load brain rot history:', err);
+      }
+    }
+
+    function fmtDate(d) {
+      if (!d) return '';
+      const date = new Date(d);
+      return isNaN(date.getTime()) ? '' : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+
+    async function loadCaptionStyles() {
+      try {
+        const resp = await apiJSON('/brainrot/styles');
+        const styles = resp.styles || {};
+        window._captionStyleMeta = styles;
+        const grid = document.getElementById('br-style-grid');
+        const keys = Object.keys(styles);
+        document.getElementById('br-style-count').textContent = `(${keys.length} styles)`;
+        grid.innerHTML = keys.map(key => {
+          const s = styles[key];
+          const previewStyle = `font-family:${s.font || 'Arial'},sans-serif;color:${s.fontcolor || 'white'};${s.borderw ? `-webkit-text-stroke:${Math.min(s.borderw,2)}px ${s.bordercolor || 'black'};` : ''}`;
+          return `<div class="style-card${key === 'brain_rot' ? ' selected' : ''}" data-style="${key}" tabindex="0" role="button" aria-label="Select ${escHtml(s.label || key)} style">
+            <div class="style-preview" style="${previewStyle}">Aa</div>
+            <div class="style-label">${escHtml(s.label || key)}</div>
+          </div>`;
+        }).join('');
+        grid.querySelectorAll('.style-card').forEach(card => {
+          card.addEventListener('click', () => selectCaptionStyle(card.dataset.style));
+          card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectCaptionStyle(card.dataset.style); } });
+        });
+        const initial = styles['brain_rot'];
+        if (initial) {
+          document.getElementById('br-style-desc').textContent = initial.description || '';
+          updateCaptionPreview('brain_rot');
+        }
+      } catch (e) { console.error('Failed to load caption styles:', e); }
+    }
+
+    function selectCaptionStyle(styleKey) {
+      document.getElementById('br-style-grid').querySelectorAll('.style-card').forEach(c => c.classList.remove('selected'));
+      const card = document.querySelector(`.style-card[data-style="${styleKey}"]`);
+      if (card) card.classList.add('selected');
+      document.getElementById('br-style').value = styleKey;
+      const desc = document.getElementById('br-style-desc');
+      const meta = window._captionStyleMeta || {};
+      const s = meta[styleKey];
+      desc.textContent = s?.description || '';
+      updateCaptionPreview(styleKey);
+    }
+
+    function updateCaptionPreview(styleKey) {
+      const meta = window._captionStyleMeta || {};
+      const s = meta[styleKey];
+      const panel = document.getElementById('br-style-preview');
+      if (!panel) return;
+      if (!s) { panel.style.display = 'none'; return; }
+      panel.style.display = '';
+      const line1 = document.getElementById('preview-caption-line1');
+      const line2 = document.getElementById('preview-caption-line2');
+      const strokeWidth = Math.min(s.borderw || 0, 2.5);
+      const style = `font-family:${s.font || 'Arial'},sans-serif;color:${s.fontcolor || 'white'};font-size:1.3rem;font-weight:700;background:${s.bgcolor || 'transparent'};${strokeWidth > 0 ? `-webkit-text-stroke:${strokeWidth}px ${s.bordercolor || 'black'};text-shadow:none;` : ''}${s.textalign ? `text-align:${s.textalign};` : 'text-align:center;'}`;
+      line1.style.cssText = style;
+      line2.style.cssText = style;
+      const animBadge = document.getElementById('preview-animation-badge');
+      const posBadge = document.getElementById('preview-position-badge');
+      if (animBadge) animBadge.textContent = s.animation ? `🎬 ${s.animation}` : '';
+      if (posBadge) posBadge.textContent = s.position ? `📍 ${s.position}` : '';
+      const viewport = document.getElementById('preview-viewport');
+      if (s.position === 'top') viewport.style.justifyContent = 'flex-start';
+      else if (s.position === 'bottom') viewport.style.justifyContent = 'flex-end';
+      else viewport.style.justifyContent = 'center';
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      updateAuthUI();
+      loadCaptionStyles();
+      loadHistory();
+      checkCreditLimit();
+      document.getElementById('br-bg-clear')?.addEventListener('click', clearBgVideo);
+      document.getElementById('br-generate-btn')?.addEventListener('click', generateScript);
+      document.getElementById('br-render-btn')?.addEventListener('click', renderAndPublish);
+      document.getElementById('br-publish-btn')?.addEventListener('click', oneClickPublish);
+      document.getElementById('br-save-template-btn')?.addEventListener('click', saveAsTemplate);
+      const tplId = getTemplateIdFromUrl();
+      if (tplId) loadTemplateById(tplId);
+    });
+
+    async function saveAsTemplate() {
+      const name = await promptDialog(_t('brainrot.template-name-prompt', 'Template name:'), '');
+      if (!name) return;
+      try {
+        await apiJSON('/templates', { method: 'POST', body: {
+          name,
+          niche: $('br-niche')?.value || '',
+          caption_style: $('br-style')?.value || 'brain_rot',
+          platform: $('br-platform')?.value || 'youtube',
+          duration: $('br-duration')?.value || '30',
+          language: $('br-language')?.value || 'en',
+        }});
+        showToast('Template saved!', 'success');
+      } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    async function loadTemplateById(templateId) {
+      try {
+        const resp = await apiJSON(`/templates/${templateId}`);
+        const t = resp.template;
+        if (!t) return;
+        if (t.niche) $('br-niche').value = t.niche;
+        if (t.platform) $('br-platform').value = t.platform;
+        if (t.duration) $('br-duration').value = t.duration;
+        if (t.caption_style) selectCaptionStyle(t.caption_style);
+        if (t.broll_mode) { /* broll mode not exposed in UI yet */ }
+        if (t.language) $('br-language').value = t.language;
+        showToast('Template applied', 'success');
+      } catch (e) { console.error('Failed to load template:', e); }
+    }
+
+    function getTemplateIdFromUrl() {
+      const p = new URLSearchParams(window.location.search);
+      return p.get('template_id');
+    }
+  </script>
+  <script defer src="choko-knowledge.js"></script>
+  <script defer src="choko.js"></script>
+</body>
+</html>
