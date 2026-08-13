@@ -1,8 +1,11 @@
 """API key model for programmatic access."""
+
 import uuid
-from datetime import datetime, timezone
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey
+from datetime import UTC, datetime
+
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String
 from sqlalchemy.orm import relationship
+
 from ..core.database import Base
 
 
@@ -15,6 +18,6 @@ class ApiKey(Base):
     name = Column(String, default="")
     is_active = Column(Boolean, default=True)
     last_used_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
     user = relationship("User", back_populates="api_keys")
