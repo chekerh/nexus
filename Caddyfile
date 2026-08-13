@@ -1,0 +1,88 @@
+nexus-caddy.localhost, {$PUBLIC_DOMAIN} {
+    @api {
+        path /api/*
+    }
+
+    @metrics {
+        path /api/v1/metrics
+    }
+
+    @auth_endpoints {
+        path /api/v1/auth/register /api/v1/auth/login /api/v1/auth/forgot-password /api/v1/auth/reset-password
+    }
+
+    handle @metrics {
+        @allowed {
+            remote_ip 127.0.0.1/32 ::1 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16
+        }
+        handle @allowed {
+            reverse_proxy app:8000
+        }
+        handle {
+            respond 403
+        }
+    }
+
+    handle @auth_endpoints {
+        rate_limit {
+            zone auth_zone {
+                key {http.request.remote.host}
+                events 10
+                window 1m
+            }
+        }
+        reverse_proxy app:8000 {
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    handle @api {
+        reverse_proxy app:8000 {
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    request_body {
+        max_size 500MB
+    }
+
+    handle {
+        root * /srv/frontend
+        try_files {path} /index.html
+        file_server
+    }
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        Content-Security-Policy "default-src 'self'; style-src 'self' fonts.googleapis.com cdnjs.cloudflare.com 'unsafe-inline'; font-src 'self' fonts.gstatic.com; script-src 'self' 'unsafe-inline' cdnjs.cloudflare.com; img-src 'self' data: blob:; connect-src 'self' https:;"
+    }
+
+    encode zstd br gzip
+
+    log {
+        output file /var/log/caddy/access.log {
+            format json
+        }
+    }
+
+    handle_errors {
+        @4xx {
+            expression {http.error.status_code} >= 400 && {http.error.status_code} < 500
+        }
+        @5xx {
+            expression {http.error.status_code} >= 500
+        }
+        handle @4xx {
+            respond "Page not found" 404
+        }
+        handle @5xx {
+            respond "Server error" 500
+        }
+    }
+}
