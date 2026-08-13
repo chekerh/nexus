@@ -1,15 +1,18 @@
-import ollama
 import json
+import logging
 import re
 import subprocess
-from pathlib import Path
-from typing import Optional, List, Dict, Tuple
-from .config import settings
-from .airllm_service import airllm_service
 
-TIMESTAMP_RE = re.compile(
-    r'^\[(\d{2}:\d{2}:\d{2}\.\d{3})\s+-->\s+(\d{2}:\d{2}:\d{2}\.\d{3})\]\s+(.*)$'
-)
+import ollama
+
+logger = logging.getLogger(__name__)
+from pathlib import Path
+
+from .airllm_service import airllm_service
+from .config import settings
+from .model_router import get_ollama_model_for_task
+
+TIMESTAMP_RE = re.compile(r"^\[(\d{2}:\d{2}:\d{2}\.\d{3})\s+-->\s+(\d{2}:\d{2}:\d{2}\.\d{3})\]\s+(.*)$")
 
 VIRAL_KEYWORDS = {
     "but": 1.0,
@@ -34,13 +37,15 @@ VIRAL_KEYWORDS = {
 
 MIN_SCENE_SCORE = 0.35
 
+
 def _to_float(value, default: float = 0.0) -> float:
     try:
         return float(value)
     except (TypeError, ValueError):
         return default
 
-def _normalize_hooks(raw_hooks: List[Dict]) -> List[Dict]:
+
+def _normalize_hooks(raw_hooks: list[dict]) -> list[dict]:
     """Normalize and enforce minimum/maximum clip durations."""
     normalized = []
     min_len = settings.CLIP_MIN_SECONDS
@@ -72,15 +77,18 @@ def _normalize_hooks(raw_hooks: List[Dict]) -> List[Dict]:
         elif cta_text:
             caption = cta_text
 
-        normalized.append({
-            "start": round(max(0.0, start), 2),
-            "end": round(max(0.0, end), 2),
-            "hook_name": hook.get("hook_name") or f"Hook {i + 1}",
-            "caption": caption,
-            "confidence": round(_to_float(hook.get("confidence", 0.5), 0.5), 2),
-        })
+        normalized.append(
+            {
+                "start": round(max(0.0, start), 2),
+                "end": round(max(0.0, end), 2),
+                "hook_name": hook.get("hook_name") or f"Hook {i + 1}",
+                "caption": caption,
+                "confidence": round(_to_float(hook.get("confidence", 0.5), 0.5), 2),
+            }
+        )
 
     return normalized
+
 
 def _read_prompt_file(path_str: str) -> str:
     try:
@@ -91,11 +99,13 @@ def _read_prompt_file(path_str: str) -> str:
         pass
     return ""
 
+
 def _timestamp_to_seconds(ts: str) -> float:
     h, m, s = ts.split(":")
     return int(h) * 3600 + int(m) * 60 + float(s)
 
-def _parse_segments(transcript: str) -> List[Dict]:
+
+def _parse_segments(transcript: str) -> list[dict]:
     segments = []
     for line in transcript.splitlines():
         match = TIMESTAMP_RE.match(line.strip())
@@ -108,15 +118,19 @@ def _parse_segments(transcript: str) -> List[Dict]:
             segments.append({"start": start_s, "end": end_s, "text": text})
     return segments
 
-def _video_duration_from_path(video_path: Optional[str]) -> float:
+
+def _video_duration_from_path(video_path: str | None) -> float:
     if not video_path:
         return 0.0
     try:
         cmd = [
             "ffprobe",
-            "-v", "error",
-            "-show_entries", "format=duration",
-            "-of", "default=noprint_wrappers=1:nokey=1",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
             video_path,
         ]
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
@@ -124,16 +138,20 @@ def _video_duration_from_path(video_path: Optional[str]) -> float:
     except Exception:
         return 0.0
 
-def _detect_scene_cuts(video_path: Optional[str], threshold: float = MIN_SCENE_SCORE) -> List[float]:
+
+def _detect_scene_cuts(video_path: str | None, threshold: float = MIN_SCENE_SCORE) -> list[float]:
     """Detect candidate scene cuts using ffmpeg scene filter."""
     if not video_path:
         return []
     try:
         cmd = [
             "ffmpeg",
-            "-i", video_path,
-            "-filter:v", f"select=gt(scene\\,{threshold}),showinfo",
-            "-f", "null",
+            "-i",
+            video_path,
+            "-filter:v",
+            f"select=gt(scene\\,{threshold}),showinfo",
+            "-f",
+            "null",
             "-",
         ]
         result = subprocess.run(cmd, capture_output=True, text=True)
@@ -143,13 +161,14 @@ def _detect_scene_cuts(video_path: Optional[str], threshold: float = MIN_SCENE_S
             points.append(_to_float(m.group(1), 0.0))
         # de-duplicate nearby points
         points.sort()
-        deduped = []
+        deduped: list[float] = []
         for p in points:
             if not deduped or abs(p - deduped[-1]) > 0.35:
                 deduped.append(round(p, 2))
         return deduped
     except Exception:
         return []
+
 
 def _score_segment_text(text: str) -> float:
     lowered = text.lower()
@@ -161,16 +180,18 @@ def _score_segment_text(text: str) -> float:
         score += 0.8
     if "!" in text:
         score += 0.6
-    if re.search(r'\$|£|€|\d+', text):
+    if re.search(r"\$|£|€|\d+", text):
         score += 0.6
     if len(text.split()) >= 12:
         score += 0.5
     return round(score, 2)
 
+
 def _overlap(a_start: float, a_end: float, b_start: float, b_end: float) -> float:
     return max(0.0, min(a_end, b_end) - max(a_start, b_start))
 
-def _candidate_from_segment(seg: Dict, target_len: float, total_duration: float) -> Tuple[float, float]:
+
+def _candidate_from_segment(seg: dict, target_len: float, total_duration: float) -> tuple[float, float]:
     mid = (seg["start"] + seg["end"]) / 2
     start = max(0.0, mid - (target_len / 2))
     end = start + target_len
@@ -179,7 +200,8 @@ def _candidate_from_segment(seg: Dict, target_len: float, total_duration: float)
         start = max(0.0, end - target_len)
     return round(start, 2), round(end, 2)
 
-def _adaptive_target_len(seg: Dict, text_score: float, density: float, wps: float) -> float:
+
+def _adaptive_target_len(seg: dict, text_score: float, density: float, wps: float) -> float:
     """Derive a dynamic clip length so outputs are not all same duration."""
     min_len = settings.CLIP_MIN_SECONDS
     max_len = settings.CLIP_MAX_SECONDS
@@ -197,7 +219,8 @@ def _adaptive_target_len(seg: Dict, text_score: float, density: float, wps: floa
     target = base + (max_len - min_len) * diversity * (dynamic_factor - 0.5)
     return round(max(min_len, min(max_len, target)), 2)
 
-def _speech_metrics(start: float, end: float, segments: List[Dict]) -> Tuple[float, float]:
+
+def _speech_metrics(start: float, end: float, segments: list[dict]) -> tuple[float, float]:
     duration = max(0.001, end - start)
     spoken_seconds = 0.0
     spoken_words = 0
@@ -214,7 +237,8 @@ def _speech_metrics(start: float, end: float, segments: List[Dict]) -> Tuple[flo
     wps = spoken_words / duration
     return round(density, 3), round(wps, 3)
 
-def _scene_bonus(start: float, end: float, scene_cuts: List[float]) -> float:
+
+def _scene_bonus(start: float, end: float, scene_cuts: list[float]) -> float:
     if not scene_cuts:
         return 0.0
     start_near = any(abs(c - start) <= 2.0 for c in scene_cuts)
@@ -226,7 +250,8 @@ def _scene_bonus(start: float, end: float, scene_cuts: List[float]) -> float:
         bonus += 0.5
     return bonus
 
-def _build_candidates(segments: List[Dict], scene_cuts: List[float], total_duration: float) -> List[Dict]:
+
+def _build_candidates(segments: list[dict], scene_cuts: list[float], total_duration: float) -> list[dict]:
     if not segments:
         return []
 
@@ -242,27 +267,24 @@ def _build_candidates(segments: List[Dict], scene_cuts: List[float], total_durat
         target_len = _adaptive_target_len(seg, text_score, density_probe, wps_probe)
         start, end = _candidate_from_segment(seg, target_len, total_duration)
         density, wps = _speech_metrics(start, end, segments)
-        score = (
-            text_score
-            + (density * 2.0)
-            + min(wps, 3.0) * 0.5
-            + _scene_bonus(start, end, scene_cuts)
-        )
+        score = text_score + (density * 2.0) + min(wps, 3.0) * 0.5 + _scene_bonus(start, end, scene_cuts)
 
-        candidates.append({
-            "start": start,
-            "end": end,
-            "score": round(score, 2),
-            "text_score": text_score,
-            "speech_density": density,
-            "words_per_sec": wps,
-            "target_len": round(end - start, 2),
-            "reason": seg["text"][:120],
-        })
+        candidates.append(
+            {
+                "start": start,
+                "end": end,
+                "score": round(score, 2),
+                "text_score": text_score,
+                "speech_density": density,
+                "words_per_sec": wps,
+                "target_len": round(end - start, 2),
+                "reason": seg["text"][:120],
+            }
+        )
 
     # Rank and remove highly overlapping near-duplicates.
     candidates.sort(key=lambda x: x["score"], reverse=True)
-    selected = []
+    selected: list[dict] = []
     for cand in candidates:
         too_close = False
         for kept in selected:
@@ -280,7 +302,8 @@ def _build_candidates(segments: List[Dict], scene_cuts: List[float], total_durat
         cand["id"] = idx
     return selected
 
-def _candidate_windows_summary(segments: List[Dict]) -> str:
+
+def _candidate_windows_summary(segments: list[dict]) -> str:
     if not segments:
         return ""
 
@@ -293,12 +316,14 @@ def _candidate_windows_summary(segments: List[Dict]) -> str:
         mid = (seg["start"] + seg["end"]) / 2
         start = max(0.0, mid - (target_len / 2))
         end = start + target_len
-        scored.append({
-            "start": round(start, 2),
-            "end": round(end, 2),
-            "score": score,
-            "reason": seg["text"][:120],
-        })
+        scored.append(
+            {
+                "start": round(start, 2),
+                "end": round(end, 2),
+                "score": score,
+                "reason": seg["text"][:120],
+            }
+        )
 
     scored.sort(key=lambda x: x["score"], reverse=True)
     top = scored[:8]
@@ -307,12 +332,11 @@ def _candidate_windows_summary(segments: List[Dict]) -> str:
 
     lines = ["Candidate windows from heuristic pre-scan (higher score = more likely viral):"]
     for idx, c in enumerate(top, start=1):
-        lines.append(
-            f"{idx}. {c['start']}s-{c['end']}s | score={c['score']} | cue={c['reason']}"
-        )
+        lines.append(f"{idx}. {c['start']}s-{c['end']}s | score={c['score']} | cue={c['reason']}")
     return "\n".join(lines)
 
-def _candidate_windows_summary_v3(candidates: List[Dict], scene_cuts: List[float]) -> str:
+
+def _candidate_windows_summary_v3(candidates: list[dict], scene_cuts: list[float]) -> str:
     if not candidates:
         return ""
     lines = [
@@ -321,14 +345,15 @@ def _candidate_windows_summary_v3(candidates: List[Dict], scene_cuts: List[float
     ]
     for c in candidates:
         lines.append(
-            f"id={c['id']} | {c['start']}s-{c['end']}s ({c.get('target_len', round(c['end']-c['start'],2))}s) | score={c['score']} | density={c['speech_density']} | wps={c['words_per_sec']} | cue={c['reason']}"
+            f"id={c['id']} | {c['start']}s-{c['end']}s ({c.get('target_len', round(c['end'] - c['start'], 2))}s) | score={c['score']} | density={c['speech_density']} | wps={c['words_per_sec']} | cue={c['reason']}"
         )
     if scene_cuts:
         preview = ", ".join([f"{x}s" for x in scene_cuts[:20]])
         lines.append(f"Detected scene cuts (first 20): {preview}")
     return "\n".join(lines)
 
-def _extract_first_json_object(text: str) -> Optional[str]:
+
+def _extract_first_json_object(text: str) -> str | None:
     start = text.find("{")
     if start == -1:
         return None
@@ -354,16 +379,17 @@ def _extract_first_json_object(text: str) -> Optional[str]:
         elif ch == "}":
             depth -= 1
             if depth == 0:
-                return text[start:i + 1]
+                return text[start : i + 1]
 
     return None
+
 
 def _chat_with_ollama(system_prompt: str, user_payload: str, analyst_model: str) -> str:
     response = ollama.chat(
         model=analyst_model,
         messages=[
-            {'role': 'system', 'content': system_prompt},
-            {'role': 'user', 'content': user_payload},
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_payload},
         ],
         keep_alive=settings.OLLAMA_KEEP_ALIVE,
         options={
@@ -372,9 +398,10 @@ def _chat_with_ollama(system_prompt: str, user_payload: str, analyst_model: str)
             "num_predict": max(200, settings.OLLAMA_NUM_PREDICT),
         },
     )
-    return response['message']['content'].strip()
+    return response["message"]["content"].strip()
 
-def _chat_with_airllm(system_prompt: str, user_payload: str) -> Optional[str]:
+
+def _chat_with_airllm(system_prompt: str, user_payload: str) -> str | None:
     """Experimental AirLLM path. Returns None on any failure so caller can fallback."""
     prompt = f"{system_prompt}\n\n{user_payload}"
     return airllm_service.generate(
@@ -383,7 +410,8 @@ def _chat_with_airllm(system_prompt: str, user_payload: str) -> Optional[str]:
         max_new_tokens=max(200, settings.OLLAMA_NUM_PREDICT),
     )
 
-def _snap_hooks_to_candidates(hooks: List[Dict], candidates: List[Dict]) -> List[Dict]:
+
+def _snap_hooks_to_candidates(hooks: list[dict], candidates: list[dict]) -> list[dict]:
     if not hooks or not candidates:
         return hooks
 
@@ -418,7 +446,8 @@ def _snap_hooks_to_candidates(hooks: List[Dict], candidates: List[Dict]) -> List
 
     return result
 
-def _fallback_hooks_from_candidates(candidates: List[Dict]) -> List[Dict]:
+
+def _fallback_hooks_from_candidates(candidates: list[dict]) -> list[dict]:
     """Guarantee at least a few hooks even when the LLM response is malformed."""
     if not candidates:
         return []
@@ -426,16 +455,19 @@ def _fallback_hooks_from_candidates(candidates: List[Dict]) -> List[Dict]:
     hooks = []
     top = candidates[:3]
     for i, c in enumerate(top, start=1):
-        hooks.append({
-            "start": c["start"],
-            "end": c["end"],
-            "hook_name": f"Hook {i}: High-Impact Moment",
-            "caption": c.get("reason", ""),
-            "confidence": round(min(0.95, max(0.35, c.get("score", 5.0) / 10.0)), 2),
-        })
+        hooks.append(
+            {
+                "start": c["start"],
+                "end": c["end"],
+                "hook_name": f"Hook {i}: High-Impact Moment",
+                "caption": c.get("reason", ""),
+                "confidence": round(min(0.95, max(0.35, c.get("score", 5.0) / 10.0)), 2),
+            }
+        )
     return hooks
 
-def analyze_transcript(transcript: str, video_path: Optional[str] = None) -> Optional[Dict]:
+
+def analyze_transcript(transcript: str, video_path: str | None = None) -> dict | None:
     """Analyzes transcript using local Ollama instance for viral hooks and strategy."""
     strategist_prompt = _read_prompt_file(settings.STRATEGIST_PROMPT_FILE)
     viral_signals_prompt = _read_prompt_file(settings.VIRAL_SIGNALS_FILE)
@@ -461,14 +493,12 @@ def analyze_transcript(transcript: str, video_path: Optional[str] = None) -> Opt
         system_prompt += "\n\n--- VIRAL SIGNALS RUBRIC ---\n" + viral_signals_prompt
 
     try:
-        analyst_model = (settings.OLLAMA_ANALYST_MODEL or settings.OLLAMA_MODEL).strip()
+        analyst_model = get_ollama_model_for_task("strategist")
         if settings.PROCESSING_PROFILE == "eco" and not settings.OLLAMA_ANALYST_MODEL:
             analyst_model = "qwen2.5:3b"
 
         segments = _parse_segments(transcript)
-        cleaned_transcript = "\n".join(
-            [f"[{s['start']:.2f} --> {s['end']:.2f}] {s['text']}" for s in segments]
-        )
+        cleaned_transcript = "\n".join([f"[{s['start']:.2f} --> {s['end']:.2f}] {s['text']}" for s in segments])
         if not cleaned_transcript:
             cleaned_transcript = transcript
         total_duration = _video_duration_from_path(video_path)
@@ -481,7 +511,7 @@ def analyze_transcript(transcript: str, video_path: Optional[str] = None) -> Opt
         if not candidate_summary:
             candidate_summary = _candidate_windows_summary(segments)
 
-        user_payload = cleaned_transcript[:max(2000, settings.ANALYSIS_TRANSCRIPT_MAX_CHARS)]
+        user_payload = cleaned_transcript[: max(2000, settings.ANALYSIS_TRANSCRIPT_MAX_CHARS)]
         if candidate_summary:
             user_payload = f"{candidate_summary}\n\nTranscript:\n{user_payload}"
 
@@ -499,7 +529,7 @@ def analyze_transcript(transcript: str, video_path: Optional[str] = None) -> Opt
         # Extract Strategy and JSON
         strategy = "Analyzing content structure..."
         if "STRATEGY:" in content:
-            strategy_match = re.search(r'STRATEGY:(.*?)(JSON:|$)', content, re.DOTALL)
+            strategy_match = re.search(r"STRATEGY:(.*?)(JSON:|$)", content, re.DOTALL)
             if strategy_match:
                 strategy = strategy_match.group(1).strip()
 
@@ -507,48 +537,50 @@ def analyze_transcript(transcript: str, video_path: Optional[str] = None) -> Opt
         json_text = _extract_first_json_object(content)
         if json_text:
             data = json.loads(json_text)
-            hooks = data.get('hooks', [])
+            hooks = data.get("hooks", [])
             hooks = _snap_hooks_to_candidates(hooks, candidates)
-            data['hooks'] = _normalize_hooks(hooks)
-            data['strategy_thought'] = strategy
-            durations = [round(h['end'] - h['start'], 2) for h in data['hooks']]
-            data['analysis_meta'] = {
-                'backend': used_backend,
-                'model': settings.AIRLLM_MODEL_ID if used_backend == 'airllm' else analyst_model,
-                'fallback_used': False,
-                'candidate_count': len(candidates),
-                'scene_cut_count': len(scene_cuts),
-                'durations': durations,
-                'duration_min': min(durations) if durations else 0,
-                'duration_max': max(durations) if durations else 0,
-                'duration_avg': round(sum(durations) / len(durations), 2) if durations else 0,
+            data["hooks"] = _normalize_hooks(hooks)
+            data["strategy_thought"] = strategy
+            durations = [round(h["end"] - h["start"], 2) for h in data["hooks"]]
+            data["analysis_meta"] = {
+                "backend": used_backend,
+                "model": settings.AIRLLM_MODEL_ID if used_backend == "airllm" else analyst_model,
+                "fallback_used": False,
+                "candidate_count": len(candidates),
+                "scene_cut_count": len(scene_cuts),
+                "durations": durations,
+                "duration_min": min(durations) if durations else 0,
+                "duration_max": max(durations) if durations else 0,
+                "duration_avg": round(sum(durations) / len(durations), 2) if durations else 0,
             }
-            if data['hooks']:
+            if data["hooks"]:
                 return data
 
         # Fallback path when model output is invalid or empty.
         fallback_hooks = _fallback_hooks_from_candidates(candidates)
         if fallback_hooks:
             normalized = _normalize_hooks(fallback_hooks)
-            durations = [round(h['end'] - h['start'], 2) for h in normalized]
+            durations = [round(h["end"] - h["start"], 2) for h in normalized]
             return {
-                'hooks': normalized,
-                'strategy_thought': strategy if strategy else "Fallback strategy applied from hybrid heuristic scoring.",
-                'analysis_meta': {
-                    'backend': used_backend,
-                    'model': settings.AIRLLM_MODEL_ID if used_backend == 'airllm' else analyst_model,
-                    'fallback_used': True,
-                    'candidate_count': len(candidates),
-                    'scene_cut_count': len(scene_cuts),
-                    'durations': durations,
-                    'duration_min': min(durations) if durations else 0,
-                    'duration_max': max(durations) if durations else 0,
-                    'duration_avg': round(sum(durations) / len(durations), 2) if durations else 0,
-                }
+                "hooks": normalized,
+                "strategy_thought": strategy
+                if strategy
+                else "Fallback strategy applied from hybrid heuristic scoring.",
+                "analysis_meta": {
+                    "backend": used_backend,
+                    "model": settings.AIRLLM_MODEL_ID if used_backend == "airllm" else analyst_model,
+                    "fallback_used": True,
+                    "candidate_count": len(candidates),
+                    "scene_cut_count": len(scene_cuts),
+                    "durations": durations,
+                    "duration_min": min(durations) if durations else 0,
+                    "duration_max": max(durations) if durations else 0,
+                    "duration_avg": round(sum(durations) / len(durations), 2) if durations else 0,
+                },
             }
 
         return None
 
     except Exception as e:
-        print(f"Ollama analysis failed: {str(e)}")
+        logger.error(f"Ollama analysis failed: {e}")
         return None

@@ -1,12 +1,17 @@
-import os
-import subprocess
-import re
 import json
-import ollama
-from typing import List, Dict, Optional
-from .config import settings
+import logging
+import os
+import re
+import subprocess
 
-TRANSCRIPT_LINE_RE = re.compile(r'^\[(\d{2}:\d{2}:\d{2}\.\d{3})\s+-->\s+(\d{2}:\d{2}:\d{2}\.\d{3})\]\s+(.*)$')
+import ollama
+
+logger = logging.getLogger(__name__)
+
+from .config import settings
+from .model_router import get_ollama_model_for_task
+
+TRANSCRIPT_LINE_RE = re.compile(r"^\[(\d{2}:\d{2}:\d{2}\.\d{3})\s+-->\s+(\d{2}:\d{2}:\d{2}\.\d{3})\]\s+(.*)$")
 
 SUBTITLE_PRESETS = {
     "bold_center": "Alignment=2,FontName=Arial,FontSize=16,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BackColour=&H80000000,Bold=1,Outline=2,Shadow=0,MarginV=28",
@@ -39,24 +44,29 @@ STYLE_KEYWORDS = {
 STYLE_IDS = ["neutral", "impact", "question", "money", "warning", "hype"]
 STYLE_ROTATION = ["impact", "question", "money", "warning", "hype", "neutral"]
 
-_FFMPEG_FILTER_CACHE: Optional[set[str]] = None
+_FFMPEG_FILTER_CACHE: set[str] | None = None
+
 
 def sanitize_filename(filename: str) -> str:
     """Removes special characters and spaces from filenames."""
     # Remove file extension first
     name = os.path.splitext(filename)[0]
     # Replace spaces and special chars with underscores
-    clean_name = re.sub(r'[^\w\-]', '_', name)
+    clean_name = re.sub(r"[^\w\-]", "_", name)
     return clean_name
+
 
 def get_video_duration(video_path: str) -> float:
     """Returns media duration in seconds using ffprobe."""
     try:
         cmd = [
             "ffprobe",
-            "-v", "error",
-            "-show_entries", "format=duration",
-            "-of", "default=noprint_wrappers=1:nokey=1",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
             video_path,
         ]
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
@@ -64,15 +74,18 @@ def get_video_duration(video_path: str) -> float:
     except Exception:
         return 0.0
 
+
 def _safe_float(value, default: float = 0.0) -> float:
     try:
         return float(value)
     except (TypeError, ValueError):
         return default
 
+
 def _ts_to_seconds(ts: str) -> float:
     h, m, s = ts.split(":")
     return int(h) * 3600 + int(m) * 60 + float(s)
+
 
 def _seconds_to_srt(seconds: float) -> str:
     total_ms = int(round(max(0.0, seconds) * 1000))
@@ -84,6 +97,7 @@ def _seconds_to_srt(seconds: float) -> str:
     ms = total_ms % 1000
     return f"{h:02}:{m:02}:{s:02},{ms:03}"
 
+
 def _seconds_to_vtt(seconds: float) -> str:
     total_ms = int(round(max(0.0, seconds) * 1000))
     h = total_ms // 3600000
@@ -93,6 +107,7 @@ def _seconds_to_vtt(seconds: float) -> str:
     s = total_ms // 1000
     ms = total_ms % 1000
     return f"{h:02}:{m:02}:{s:02}.{ms:03}"
+
 
 def _seconds_to_ass(seconds: float) -> str:
     centis = int(round(max(0.0, seconds) * 100))
@@ -104,18 +119,21 @@ def _seconds_to_ass(seconds: float) -> str:
     cs = centis % 100
     return f"{h}:{m:02}:{s:02}.{cs:02}"
 
+
 def _escape_filter_path(path: str) -> str:
     # ffmpeg filter parser escaping
     return path.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
 
-def _split_caption_words(text: str, max_words: int) -> List[str]:
+
+def _split_caption_words(text: str, max_words: int) -> list[str]:
     words = text.split()
     if len(words) <= max_words:
         return [text]
     chunks = []
     for i in range(0, len(words), max_words):
-        chunks.append(" ".join(words[i:i + max_words]))
+        chunks.append(" ".join(words[i : i + max_words]))
     return chunks
+
 
 def _highlight_caption_words(text: str, highlight_words: set[str]) -> str:
     if not highlight_words:
@@ -131,6 +149,7 @@ def _highlight_caption_words(text: str, highlight_words: set[str]) -> str:
             styled_tokens.append(token)
     return " ".join(styled_tokens)
 
+
 def _choose_caption_style(text: str) -> str:
     lowered = text.lower()
     if "?" in text or lowered.startswith("why") or lowered.startswith("how"):
@@ -145,13 +164,15 @@ def _choose_caption_style(text: str) -> str:
         return "impact"
     return "neutral"
 
+
 def _choose_style_model() -> str:
-    model = (settings.OLLAMA_STYLE_MODEL or settings.OLLAMA_ANALYST_MODEL or settings.OLLAMA_MODEL).strip()
+    model = get_ollama_model_for_task("caption_style")
     if settings.PROCESSING_PROFILE == "eco" and not settings.OLLAMA_STYLE_MODEL:
         return "qwen2.5:0.5b"
     return model
 
-def _infer_caption_styles_with_ai(texts: List[str]) -> List[str]:
+
+def _infer_caption_styles_with_ai(texts: list[str]) -> list[str]:
     if not texts:
         return []
 
@@ -160,9 +181,9 @@ def _infer_caption_styles_with_ai(texts: List[str]) -> List[str]:
         "You are a short-video subtitle style classifier. "
         "For each input caption text, output one style from this set only: "
         "neutral, impact, question, money, warning, hype. "
-        "Output strict JSON only in this format: {\"styles\": [\"style1\", \"style2\", ...]}."
+        'Output strict JSON only in this format: {"styles": ["style1", "style2", ...]}.'
     )
-    payload_lines = [f"{i+1}. {t}" for i, t in enumerate(texts)]
+    payload_lines = [f"{i + 1}. {t}" for i, t in enumerate(texts)]
     user = "Caption lines:\n" + "\n".join(payload_lines)
 
     try:
@@ -193,10 +214,11 @@ def _infer_caption_styles_with_ai(texts: List[str]) -> List[str]:
     except Exception:
         return []
 
-def _parse_transcript_segments(transcript: Optional[str]) -> List[Dict]:
+
+def _parse_transcript_segments(transcript: str | None) -> list[dict]:
     if not transcript:
         return []
-    segments: List[Dict] = []
+    segments: list[dict] = []
     for line in transcript.splitlines():
         match = TRANSCRIPT_LINE_RE.match(line.strip())
         if not match:
@@ -208,8 +230,9 @@ def _parse_transcript_segments(transcript: Optional[str]) -> List[Dict]:
             segments.append({"start": start, "end": end, "text": text})
     return segments
 
-def _write_clip_srt(srt_path: str, segments: List[Dict], clip_start: float, clip_end: float, max_words: int) -> bool:
-    clip_entries: List[Dict] = []
+
+def _write_clip_srt(srt_path: str, segments: list[dict], clip_start: float, clip_end: float, max_words: int) -> bool:
+    clip_entries: list[dict] = []
     for seg in segments:
         overlap_start = max(clip_start, seg["start"])
         overlap_end = min(clip_end, seg["end"])
@@ -225,16 +248,18 @@ def _write_clip_srt(srt_path: str, segments: List[Dict], clip_start: float, clip
             chunk_start = relative_start + idx * chunk_duration
             chunk_end = min(relative_end, chunk_start + chunk_duration)
             if chunk_end > chunk_start:
-                clip_entries.append({
-                    "start": chunk_start,
-                    "end": chunk_end,
-                    "text": chunk,
-                })
+                clip_entries.append(
+                    {
+                        "start": chunk_start,
+                        "end": chunk_end,
+                        "text": chunk,
+                    }
+                )
 
     if not clip_entries:
         return False
 
-    lines: List[str] = []
+    lines: list[str] = []
     for i, entry in enumerate(clip_entries, start=1):
         lines.append(str(i))
         lines.append(f"{_seconds_to_srt(entry['start'])} --> {_seconds_to_srt(entry['end'])}")
@@ -244,6 +269,7 @@ def _write_clip_srt(srt_path: str, segments: List[Dict], clip_start: float, clip
     with open(srt_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines).strip() + "\n")
     return True
+
 
 def _ass_style_name(style_id: str) -> str:
     mapping = {
@@ -256,6 +282,7 @@ def _ass_style_name(style_id: str) -> str:
     }
     return mapping.get(style_id, "CapNeutral")
 
+
 def _ass_effect_text(style_id: str, text: str) -> str:
     if style_id in {"impact", "hype"}:
         return r"{\fscx118\fscy118\t(0,180,\fscx100\fscy100)}" + text
@@ -264,6 +291,7 @@ def _ass_effect_text(style_id: str, text: str) -> str:
     if style_id == "warning":
         return r"{\bord3}" + text
     return text
+
 
 def _pick_alternate_style(current: str, cue_text: str, position: int) -> str:
     text = (cue_text or "").lower()
@@ -279,7 +307,8 @@ def _pick_alternate_style(current: str, cue_text: str, position: int) -> str:
             return candidate
     return "neutral"
 
-def _diversify_style_sequence(entries: List[Dict], min_variety: int) -> None:
+
+def _diversify_style_sequence(entries: list[dict], min_variety: int) -> None:
     if not entries:
         return
 
@@ -315,7 +344,8 @@ def _diversify_style_sequence(entries: List[Dict], min_variety: int) -> None:
             needed -= 1
         idx += 2
 
-def _assign_visual_variants(entries: List[Dict]) -> None:
+
+def _assign_visual_variants(entries: list[dict]) -> None:
     for i, entry in enumerate(entries):
         style = entry.get("style", "neutral")
         variant_base = 1 + (i % 4)
@@ -326,8 +356,19 @@ def _assign_visual_variants(entries: List[Dict]) -> None:
         entry["variant"] = variant_base
         entry["cue_index"] = i + 1
 
-def _write_clip_ass(ass_path: str, segments: List[Dict], clip_start: float, clip_end: float, max_words: int, font_size: int, process_id: Optional[str] = None, thought_callback=None, clip_index: int = 0) -> bool:
-    clip_entries: List[Dict] = []
+
+def _write_clip_ass(
+    ass_path: str,
+    segments: list[dict],
+    clip_start: float,
+    clip_end: float,
+    max_words: int,
+    font_size: int,
+    process_id: str | None = None,
+    thought_callback=None,
+    clip_index: int = 0,
+) -> bool:
+    clip_entries: list[dict] = []
     for seg in segments:
         overlap_start = max(clip_start, seg["start"])
         overlap_end = min(clip_end, seg["end"])
@@ -343,12 +384,14 @@ def _write_clip_ass(ass_path: str, segments: List[Dict], clip_start: float, clip
             chunk_start = relative_start + idx * chunk_duration
             chunk_end = min(relative_end, chunk_start + chunk_duration)
             if chunk_end > chunk_start:
-                clip_entries.append({
-                    "start": chunk_start,
-                    "end": chunk_end,
-                    "text": chunk,
-                    "style": _choose_caption_style(chunk),
-                })
+                clip_entries.append(
+                    {
+                        "start": chunk_start,
+                        "end": chunk_end,
+                        "text": chunk,
+                        "style": _choose_caption_style(chunk),
+                    }
+                )
 
     if not clip_entries:
         return False
@@ -356,24 +399,28 @@ def _write_clip_ass(ass_path: str, segments: List[Dict], clip_start: float, clip
     mode = (settings.CAPTION_STYLE_MODE or "hybrid").strip().lower()
     ai_limit = max(0, settings.CAPTION_STYLE_AI_MAX_CUES)
     if mode in {"ai", "hybrid"} and ai_limit > 0:
-        ai_indexes = [
-            idx for idx, cue in enumerate(clip_entries)
-            if mode == "ai" or cue.get("style") == "neutral"
-        ][:ai_limit]
+        ai_indexes = [idx for idx, cue in enumerate(clip_entries) if mode == "ai" or cue.get("style") == "neutral"][
+            :ai_limit
+        ]
         ai_texts = [clip_entries[idx]["text"] for idx in ai_indexes]
         ai_styles = _infer_caption_styles_with_ai(ai_texts)
         if ai_styles:
-            for idx, style in zip(ai_indexes, ai_styles):
+            for idx, style in zip(ai_indexes, ai_styles, strict=False):
                 if style in STYLE_IDS:
                     clip_entries[idx]["style"] = style
             if thought_callback:
-                thought_callback(process_id, f"Caption Engine: Animated subtitle styles updated by AI on clip {clip_index} ({len(ai_styles)} cues).")
+                thought_callback(
+                    process_id,
+                    f"Caption Engine: Animated subtitle styles updated by AI on clip {clip_index} ({len(ai_styles)} cues).",
+                )
 
     _diversify_style_sequence(clip_entries, settings.CAPTION_STYLE_MIN_VARIETY)
     _assign_visual_variants(clip_entries)
     if thought_callback and clip_entries:
         unique_styles = len({c.get("style", "neutral") for c in clip_entries})
-        thought_callback(process_id, f"Caption Engine: Clip {clip_index} animated styles diversified ({unique_styles} style groups).")
+        thought_callback(
+            process_id, f"Caption Engine: Clip {clip_index} animated styles diversified ({unique_styles} style groups)."
+        )
 
     ass_lines = [
         "[Script Info]",
@@ -409,10 +456,12 @@ def _write_clip_ass(ass_path: str, segments: List[Dict], clip_start: float, clip
         f.write("\n".join(ass_lines) + "\n")
     return True
 
-def _get_format_preset_filters(preset: str = "") -> List[str]:
+
+def _get_format_preset_filters(preset: str = "") -> list[str]:
     if not preset:
         preset = (settings.CLIP_FORMAT_PRESET or "source").strip().lower()
     return list(FORMAT_PRESET_FILTERS.get(preset, FORMAT_PRESET_FILTERS["source"]))
+
 
 def _ffmpeg_supports_filter(filter_name: str) -> bool:
     global _FFMPEG_FILTER_CACHE
@@ -429,7 +478,8 @@ def _ffmpeg_supports_filter(filter_name: str) -> bool:
     except Exception:
         return False
 
-def _build_cta_text_overlay(duration: float, cta_text: str) -> Optional[str]:
+
+def _build_cta_text_overlay(duration: float, cta_text: str) -> str | None:
     """Build FFmpeg drawtext filter for CTA overlay at clip end."""
     if not cta_text or not cta_text.strip():
         return None
@@ -449,7 +499,9 @@ def _build_cta_text_overlay(duration: float, cta_text: str) -> Optional[str]:
     )
 
 
-def _build_caption_drawtext_filters(transcript_segments: List[Dict], clip_start: float, clip_end: float, max_words: int = 5) -> List[str]:
+def _build_caption_drawtext_filters(
+    transcript_segments: list[dict], clip_start: float, clip_end: float, max_words: int = 5
+) -> list[str]:
     """Build multiple drawtext filters for caption burn-in when subtitles filter is unavailable."""
     filters = []
 
@@ -478,7 +530,7 @@ def _build_caption_drawtext_filters(transcript_segments: List[Dict], clip_start:
             # Split into chunks
             chunks = []
             for i in range(0, len(words), max_words):
-                chunk = " ".join(words[i:i+max_words])
+                chunk = " ".join(words[i : i + max_words])
                 chunks.append(chunk)
         else:
             chunks = [text]
@@ -509,7 +561,25 @@ def _build_caption_drawtext_filters(transcript_segments: List[Dict], clip_start:
     return filters
 
 
-def _build_ffmpeg_command(video_path: str, start: float, duration: float, output_path: str, subtitle_path: Optional[str], transcript_segments: List[Dict], process_id: str = None, thought_callback=None, clip_index: int = 0, enable_format: bool = True, enable_transitions: bool = True, enable_zoom: bool = True, enable_subtitles: bool = True, animated_captions: bool = True, cta_text: str = "", enable_cta: bool = True, format_preset: str = "vertical_9_16") -> List[str]:
+def _build_ffmpeg_command(
+    video_path: str,
+    start: float,
+    duration: float,
+    output_path: str,
+    subtitle_path: str | None,
+    transcript_segments: list[dict],
+    process_id: str | None = None,
+    thought_callback=None,
+    clip_index: int = 0,
+    enable_format: bool = True,
+    enable_transitions: bool = True,
+    enable_zoom: bool = True,
+    enable_subtitles: bool = True,
+    animated_captions: bool = True,
+    cta_text: str = "",
+    enable_cta: bool = True,
+    format_preset: str = "vertical_9_16",
+) -> list[str]:
     cmd = ["ffmpeg", "-y", "-ss", str(start), "-t", str(duration), "-i", video_path]
     vf_parts = _get_format_preset_filters(format_preset) if enable_format else []
     af_parts = []
@@ -517,20 +587,22 @@ def _build_ffmpeg_command(video_path: str, start: float, duration: float, output
     if enable_transitions and settings.CLIP_ENABLE_TRANSITIONS:
         fade_len = max(0.05, min(settings.CLIP_FADE_SECONDS, max(0.05, duration / 3)))
         fade_out_start = max(0.0, duration - fade_len)
-        vf_parts.extend([
-            f"fade=t=in:st=0:d={fade_len}",
-            f"fade=t=out:st={fade_out_start}:d={fade_len}",
-        ])
-        af_parts.extend([
-            f"afade=t=in:st=0:d={fade_len}",
-            f"afade=t=out:st={fade_out_start}:d={fade_len}",
-        ])
+        vf_parts.extend(
+            [
+                f"fade=t=in:st=0:d={fade_len}",
+                f"fade=t=out:st={fade_out_start}:d={fade_len}",
+            ]
+        )
+        af_parts.extend(
+            [
+                f"afade=t=in:st=0:d={fade_len}",
+                f"afade=t=out:st={fade_out_start}:d={fade_len}",
+            ]
+        )
 
     if enable_zoom and settings.CLIP_ENABLE_SUBTLE_ZOOM:
         zoom_max = max(1.0, settings.CLIP_ZOOM_MAX)
-        vf_parts.append(
-            f"scale=iw*{zoom_max}:ih*{zoom_max},crop=iw/{zoom_max}:ih/{zoom_max}"
-        )
+        vf_parts.append(f"scale=iw*{zoom_max}:ih*{zoom_max},crop=iw/{zoom_max}:ih/{zoom_max}")
 
     # Handle subtitle/caption burn-in
     if settings.CLIP_ENABLE_SUBTITLES and transcript_segments:
@@ -571,7 +643,10 @@ def _build_ffmpeg_command(video_path: str, start: float, duration: float, output
                     vf_parts.append(f"subtitles='{escaped_sub_path}':force_style='{preset}'")
                 if thought_callback:
                     mode = "animated" if (animated_captions and settings.CLIP_ENABLE_ANIMATED_CAPTIONS) else "static"
-                    thought_callback(process_id, f"Caption Engine: Burn-in subtitles enabled for clip {clip_index} ({mode} / {settings.CLIP_SUBTITLE_PRESET}).")
+                    thought_callback(
+                        process_id,
+                        f"Caption Engine: Burn-in subtitles enabled for clip {clip_index} ({mode} / {settings.CLIP_SUBTITLE_PRESET}).",
+                    )
 
         elif can_drawtext:
             # Fallback: Use drawtext filter to burn captions directly
@@ -579,17 +654,23 @@ def _build_ffmpeg_command(video_path: str, start: float, duration: float, output
                 transcript_segments,
                 clip_start=start,
                 clip_end=start + duration,
-                max_words=max(3, settings.CLIP_SUBTITLE_MAX_WORDS)
+                max_words=max(3, settings.CLIP_SUBTITLE_MAX_WORDS),
             )
             if caption_filters:
                 vf_parts.extend(caption_filters)
                 if thought_callback:
-                    thought_callback(process_id, f"Caption Engine: Burn-in captions enabled using drawtext fallback for clip {clip_index} ({len(caption_filters)} caption segments).")
+                    thought_callback(
+                        process_id,
+                        f"Caption Engine: Burn-in captions enabled using drawtext fallback for clip {clip_index} ({len(caption_filters)} caption segments).",
+                    )
 
         else:
             # No burn-in available - will need external caption file
             if thought_callback:
-                thought_callback(process_id, f"Caption Engine: WARNING - Neither 'subtitles' nor 'drawtext' filters available. Captions will NOT be burned into video.")
+                thought_callback(
+                    process_id,
+                    "Caption Engine: WARNING - Neither 'subtitles' nor 'drawtext' filters available. Captions will NOT be burned into video.",
+                )
 
     # Add CTA text overlay at end of clip if enabled and provided
     cta_to_use = cta_text.strip() if cta_text else ""
@@ -620,7 +701,10 @@ def _build_ffmpeg_command(video_path: str, start: float, duration: float, output
     cmd.extend(["-c:a", "aac", "-b:a", "128k", output_path])
     return cmd
 
-def _run_ffmpeg_command(cmd: List[str], process_id: str = None, active_pids: dict = None) -> tuple[bool, str]:
+
+def _run_ffmpeg_command(
+    cmd: list[str], process_id: str | None = None, active_pids: dict | None = None
+) -> tuple[bool, str]:
     process = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
@@ -639,8 +723,9 @@ def _run_ffmpeg_command(cmd: List[str], process_id: str = None, active_pids: dic
         active_pids.pop(process_id, None)
     return process.returncode == 0, "\n".join(output_lines)
 
-def _write_clip_vtt(vtt_path: str, segments: List[Dict], clip_start: float, clip_end: float, max_words: int) -> bool:
-    clip_entries: List[Dict] = []
+
+def _write_clip_vtt(vtt_path: str, segments: list[dict], clip_start: float, clip_end: float, max_words: int) -> bool:
+    clip_entries: list[dict] = []
     for seg in segments:
         overlap_start = max(clip_start, seg["start"])
         overlap_end = min(clip_end, seg["end"])
@@ -656,11 +741,13 @@ def _write_clip_vtt(vtt_path: str, segments: List[Dict], clip_start: float, clip
             chunk_start = relative_start + idx * chunk_duration
             chunk_end = min(relative_end, chunk_start + chunk_duration)
             if chunk_end > chunk_start:
-                clip_entries.append({
-                    "start": chunk_start,
-                    "end": chunk_end,
-                    "text": chunk,
-                })
+                clip_entries.append(
+                    {
+                        "start": chunk_start,
+                        "end": chunk_end,
+                        "text": chunk,
+                    }
+                )
 
     if not clip_entries:
         return False
@@ -675,8 +762,18 @@ def _write_clip_vtt(vtt_path: str, segments: List[Dict], clip_start: float, clip
         f.write("\n".join(lines).strip() + "\n")
     return True
 
-def _write_clip_cues_json(cues_path: str, segments: List[Dict], clip_start: float, clip_end: float, max_words: int, process_id: Optional[str] = None, thought_callback=None, clip_index: int = 0) -> bool:
-    cues: List[Dict] = []
+
+def _write_clip_cues_json(
+    cues_path: str,
+    segments: list[dict],
+    clip_start: float,
+    clip_end: float,
+    max_words: int,
+    process_id: str | None = None,
+    thought_callback=None,
+    clip_index: int = 0,
+) -> bool:
+    cues: list[dict] = []
     for seg in segments:
         overlap_start = max(clip_start, seg["start"])
         overlap_end = min(clip_end, seg["end"])
@@ -692,12 +789,14 @@ def _write_clip_cues_json(cues_path: str, segments: List[Dict], clip_start: floa
             chunk_start = relative_start + idx * chunk_duration
             chunk_end = min(relative_end, chunk_start + chunk_duration)
             if chunk_end > chunk_start:
-                cues.append({
-                    "start": round(chunk_start, 3),
-                    "end": round(chunk_end, 3),
-                    "text": chunk,
-                    "style": _choose_caption_style(chunk),
-                })
+                cues.append(
+                    {
+                        "start": round(chunk_start, 3),
+                        "end": round(chunk_end, 3),
+                        "text": chunk,
+                        "style": _choose_caption_style(chunk),
+                    }
+                )
 
     if not cues:
         return False
@@ -705,24 +804,26 @@ def _write_clip_cues_json(cues_path: str, segments: List[Dict], clip_start: floa
     mode = (settings.CAPTION_STYLE_MODE or "hybrid").strip().lower()
     ai_limit = max(0, settings.CAPTION_STYLE_AI_MAX_CUES)
     if mode in {"ai", "hybrid"} and ai_limit > 0:
-        ai_indexes = [
-            idx for idx, cue in enumerate(cues)
-            if mode == "ai" or cue.get("style") == "neutral"
-        ][:ai_limit]
+        ai_indexes = [idx for idx, cue in enumerate(cues) if mode == "ai" or cue.get("style") == "neutral"][:ai_limit]
         ai_texts = [cues[idx]["text"] for idx in ai_indexes]
         ai_styles = _infer_caption_styles_with_ai(ai_texts)
         if ai_styles:
-            for idx, style in zip(ai_indexes, ai_styles):
+            for idx, style in zip(ai_indexes, ai_styles, strict=False):
                 if style in STYLE_IDS:
                     cues[idx]["style"] = style
             if thought_callback:
-                thought_callback(process_id, f"Caption Engine: AI style pass applied on clip {clip_index} ({len(ai_styles)} cues, mode={mode}, model={_choose_style_model()}).")
+                thought_callback(
+                    process_id,
+                    f"Caption Engine: AI style pass applied on clip {clip_index} ({len(ai_styles)} cues, mode={mode}, model={_choose_style_model()}).",
+                )
 
     _diversify_style_sequence(cues, settings.CAPTION_STYLE_MIN_VARIETY)
     _assign_visual_variants(cues)
     if thought_callback and cues:
         unique_styles = len({c.get("style", "neutral") for c in cues})
-        thought_callback(process_id, f"Caption Engine: Clip {clip_index} overlay styles diversified ({unique_styles} style groups).")
+        thought_callback(
+            process_id, f"Caption Engine: Clip {clip_index} overlay styles diversified ({unique_styles} style groups)."
+        )
 
     payload = {
         "styles": CAPTION_STYLES,
@@ -732,32 +833,55 @@ def _write_clip_cues_json(cues_path: str, segments: List[Dict], clip_start: floa
         json.dump(payload, f, ensure_ascii=False)
     return True
 
+
 def _get_video_info(video_path: str) -> tuple:
     """Get video duration and dimensions using ffprobe."""
     try:
         # Get duration
         result = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-             "-of", "default=noprint_wrappers=1:nokey=1", video_path],
-            capture_output=True, text=True, timeout=30
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                video_path,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         duration = float(result.stdout.strip()) if result.returncode == 0 else 0.0
-        
+
         # Get width and height
         result = subprocess.run(
-            ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
-             "-of", "csv=s=x:p=0", video_path],
-            capture_output=True, text=True, timeout=30
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=width,height",
+                "-of",
+                "csv=s=x:p=0",
+                video_path,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         width, height = 1080, 1920  # Default to vertical
         if result.returncode == 0 and "x" in result.stdout.strip():
             parts = result.stdout.strip().split("x")
             if len(parts) == 2:
                 width, height = int(parts[0]), int(parts[1])
-        
+
         return duration, width, height
     except Exception as e:
-        print(f"Error getting video info: {e}")
+        logger.error(f"Error getting video info: {e}")
         return 0.0, 1080, 1920
 
 
@@ -765,9 +889,10 @@ def _get_image_info(image_path: str) -> tuple:
     """Get image dimensions using ffprobe."""
     try:
         result = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries", "stream=width,height",
-             "-of", "csv=s=x:p=0", image_path],
-            capture_output=True, text=True, timeout=30
+            ["ffprobe", "-v", "error", "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", image_path],
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         if result.returncode == 0 and "x" in result.stdout.strip():
             parts = result.stdout.strip().split("x")
@@ -775,11 +900,19 @@ def _get_image_info(image_path: str) -> tuple:
                 return int(parts[0]), int(parts[1])
         return 1920, 1080  # Default fallback
     except Exception as e:
-        print(f"Error getting image info: {e}")
+        logger.error(f"Error getting image info: {e}")
         return 1920, 1080
 
 
-def _append_endscreen_to_clip(clip_path: str, endscreen_path: str, cta_text: str, endscreen_duration: float = 3.0, process_id: str = None, clip_index: int = 0, thought_callback=None) -> bool:
+def _append_endscreen_to_clip(
+    clip_path: str,
+    endscreen_path: str,
+    cta_text: str,
+    endscreen_duration: float = 3.0,
+    process_id: str | None = None,
+    clip_index: int = 0,
+    thought_callback=None,
+) -> bool:
     """Append end screen image to clip with animated transition and CTA text overlay."""
     try:
         temp_output = clip_path + ".temp.mp4"
@@ -788,7 +921,7 @@ def _append_endscreen_to_clip(clip_path: str, endscreen_path: str, cta_text: str
         # Get clip duration and dimensions
         clip_duration, video_width, video_height = _get_video_info(clip_path)
         if clip_duration <= 0:
-            print(f"Could not determine clip duration for {clip_path}")
+            logger.warning(f"Could not determine clip duration for {clip_path}")
             return False
 
         # Calculate fade start (0.5s before end, or at start if clip < 0.5s)
@@ -806,14 +939,16 @@ def _append_endscreen_to_clip(clip_path: str, endscreen_path: str, cta_text: str
         # 2. Scale end screen to match video dimensions (center crop or fit)
         # 3. Show the end screen image for endscreen_duration seconds
         # 4. Add CTA text overlay on the end screen (if drawtext available)
-        
+
         # Get actual image dimensions and calculate exact crop-to-fill dimensions
         img_width, img_height = _get_image_info(endscreen_path)
         img_aspect = img_width / img_height if img_height > 0 else 1.0
         video_aspect = video_width / video_height if video_height > 0 else 0.56
-        
-        print(f"End screen: image={img_width}x{img_height} (aspect={img_aspect:.3f}), video={video_width}x{video_height} (aspect={video_aspect:.3f})")
-        
+
+        logger.info(
+            f"End screen: image={img_width}x{img_height} aspect={img_aspect:.3f}, video={video_width}x{video_height} aspect={video_aspect:.3f}"
+        )
+
         # Calculate exact target dimensions to cover the frame (crop-to-fill)
         if img_aspect > video_aspect:
             # Image is wider - scale to match video height, width will exceed
@@ -823,34 +958,34 @@ def _append_endscreen_to_clip(clip_path: str, endscreen_path: str, cta_text: str
             # Image is taller - scale to match video width, height will exceed
             target_w = video_width
             target_h = int(video_width / img_aspect)
-        
+
         # Ensure target dimensions are at least as big as video
         target_w = max(target_w, video_width)
         target_h = max(target_h, video_height)
-        
+
         # Ensure even dimensions (required by many codecs)
         target_w = target_w + (target_w % 2)
         target_h = target_h + (target_h % 2)
-        
+
         # Center crop coordinates (ensure non-negative)
         crop_x = max(0, (target_w - video_width) // 2)
         crop_y = max(0, (target_h - video_height) // 2)
-        
+
         # Validate crop fits within scaled image
         if crop_x + video_width > target_w:
             crop_x = max(0, target_w - video_width)
         if crop_y + video_height > target_h:
             crop_y = max(0, target_h - video_height)
-        
-        print(f"Filter params: scale={target_w}:{target_h}, crop={video_width}:{video_height}:{crop_x}:{crop_y}")
-        
+
+        logger.info(f"Filter params: scale={target_w}:{target_h}, crop={video_width}:{video_height}:{crop_x}:{crop_y}")
+
         # Build filter chain with exact values (no expressions)
         scale_filter = (
             f"scale={target_w}:{target_h}:flags=lanczos,"
             f"crop={video_width}:{video_height}:{crop_x}:{crop_y},"
             f"setsar=1,format=pix_fmts=yuv420p"
         )
-        
+
         if can_drawtext:
             filter_complex = (
                 f"[0:v]fade=t=out:st={fade_start:.3f}:d=0.5,format=pix_fmts=yuv420p[clip]; "
@@ -878,23 +1013,34 @@ def _append_endscreen_to_clip(clip_path: str, endscreen_path: str, cta_text: str
 
         for enc_idx, encoder_opts in enumerate(encoder_attempts):
             cmd = [
-                "ffmpeg", "-y",
+                "ffmpeg",
+                "-y",
                 # Input 0: video clip
-                "-i", clip_path,
+                "-i",
+                clip_path,
                 # Input 1: end screen image (looped)
-                "-loop", "1", "-i", endscreen_path,
+                "-loop",
+                "1",
+                "-i",
+                endscreen_path,
                 # Complex filter
-                "-filter_complex", filter_complex,
+                "-filter_complex",
+                filter_complex,
                 # Map video from filter complex
-                "-map", video_map,
+                "-map",
+                video_map,
                 # Map audio from original clip only (no audio from image)
-                "-map", "0:a?",
+                "-map",
+                "0:a?",
                 # Copy audio codec
-                "-c:a", "aac", "-b:a", "128k",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "128k",
                 # Video codec settings
                 *encoder_opts,
                 # Output
-                temp_output
+                temp_output,
             ]
 
             success, output = _run_ffmpeg_command(cmd, process_id=process_id)
@@ -903,24 +1049,42 @@ def _append_endscreen_to_clip(clip_path: str, endscreen_path: str, cta_text: str
                 if thought_callback:
                     enc_name = "hardware" if enc_idx == 0 else "software"
                     if can_drawtext:
-                        thought_callback(process_id, f"End Screen Studio: Clip {clip_index} finalized with end screen + CTA overlay ({enc_name} encoder).")
+                        thought_callback(
+                            process_id,
+                            f"End Screen Studio: Clip {clip_index} finalized with end screen + CTA overlay ({enc_name} encoder).",
+                        )
                     else:
-                        thought_callback(process_id, f"End Screen Studio: Clip {clip_index} finalized with end screen ({enc_name} encoder, CTA skipped).")
+                        thought_callback(
+                            process_id,
+                            f"End Screen Studio: Clip {clip_index} finalized with end screen ({enc_name} encoder, CTA skipped).",
+                        )
                 return True
             else:
                 if os.path.exists(temp_output):
                     os.remove(temp_output)
                 if enc_idx == 0:
-                    print(f"Hardware encoder failed for end screen, trying software encoder...")
+                    logger.warning("Hardware encoder failed for end screen, trying software encoder...")
                 else:
-                    print(f"Error appending end screen: {output}")
+                    logger.error(f"Error appending end screen: {output}")
                     return False
-    except Exception as e:
-        print(f"Exception appending end screen: {e}")
+    except Exception:
+        logger.exception("Exception appending end screen: {e}")
         return False
 
+    return False
 
-def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active_pids: dict = None, thought_callback=None, transcript: Optional[str] = None, endscreen_path: Optional[str] = None, cta_text: str = "", aspect_ratio: str = "vertical_9_16") -> List[str]:
+
+def cut_video(
+    video_path: str,
+    hooks: list[dict],
+    process_id: str | None = None,
+    active_pids: dict | None = None,
+    thought_callback=None,
+    transcript: str | None = None,
+    endscreen_path: str | None = None,
+    cta_text: str = "",
+    aspect_ratio: str = "vertical_9_16",
+) -> list[str]:
     """Cuts a video into clips with PID tracking and live streaming."""
     output_clips = []
     raw_base_name = os.path.basename(video_path)
@@ -939,9 +1103,8 @@ def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active
     endscreen_duration = settings.CAPTION_CTA_END_IMAGE_DURATION if settings.CAPTION_CTA_END_IMAGE_DURATION else 3.0
 
     for i, hook in enumerate(hooks):
-
-        start = _safe_float(hook.get('start', 0.0), 0.0)
-        end = _safe_float(hook.get('end', 0.0), 0.0)
+        start = _safe_float(hook.get("start", 0.0), 0.0)
+        end = _safe_float(hook.get("end", 0.0), 0.0)
         if end < start:
             start, end = end, start
 
@@ -977,17 +1140,20 @@ def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active
         duration = end - start
         if duration <= 0:
             continue
-            
-        output_name = f"{clean_base_name}_hook_{i+1}.mp4"
+
+        output_name = f"{clean_base_name}_hook_{i + 1}.mp4"
         output_path = os.path.join(clips_dir, output_name)
         subtitle_ext = "ass" if settings.CLIP_ENABLE_ANIMATED_CAPTIONS else "srt"
-        subtitle_path = os.path.join(clips_dir, f"{clean_base_name}_hook_{i+1}.{subtitle_ext}")
-        subtitle_vtt_path = os.path.join(clips_dir, f"{clean_base_name}_hook_{i+1}.vtt")
-        subtitle_cues_path = os.path.join(clips_dir, f"{clean_base_name}_hook_{i+1}.cues.json")
-        
+        subtitle_path = os.path.join(clips_dir, f"{clean_base_name}_hook_{i + 1}.{subtitle_ext}")
+        subtitle_vtt_path = os.path.join(clips_dir, f"{clean_base_name}_hook_{i + 1}.vtt")
+        subtitle_cues_path = os.path.join(clips_dir, f"{clean_base_name}_hook_{i + 1}.cues.json")
+
         if thought_callback:
-            thought_callback(process_id, f"FFmpeg: Surgically extracting clip {i+1} ({start:.2f}s to {end:.2f}s | {duration:.2f}s)...")
-        
+            thought_callback(
+                process_id,
+                f"FFmpeg: Surgically extracting clip {i + 1} ({start:.2f}s to {end:.2f}s | {duration:.2f}s)...",
+            )
+
         try:
             if settings.CLIP_ENABLE_SUBTITLES and transcript_segments:
                 _write_clip_vtt(
@@ -1019,17 +1185,47 @@ def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active
             final_cta_text = cta_text if cta_text else hook_cta_text
 
             attempts = [
-                {"enable_format": True, "enable_transitions": True, "enable_zoom": True, "enable_subtitles": can_burn_subtitles, "animated_captions": True, "enable_cta": can_drawtext},
-                {"enable_format": True, "enable_transitions": True, "enable_zoom": True, "enable_subtitles": can_burn_subtitles, "animated_captions": False, "enable_cta": can_drawtext},
-                {"enable_format": True, "enable_transitions": True, "enable_zoom": True, "enable_subtitles": False, "animated_captions": False, "enable_cta": can_drawtext},
-                {"enable_format": False, "enable_transitions": False, "enable_zoom": False, "enable_subtitles": False, "animated_captions": False, "enable_cta": False},
+                {
+                    "enable_format": True,
+                    "enable_transitions": True,
+                    "enable_zoom": True,
+                    "enable_subtitles": can_burn_subtitles,
+                    "animated_captions": True,
+                    "enable_cta": can_drawtext,
+                },
+                {
+                    "enable_format": True,
+                    "enable_transitions": True,
+                    "enable_zoom": True,
+                    "enable_subtitles": can_burn_subtitles,
+                    "animated_captions": False,
+                    "enable_cta": can_drawtext,
+                },
+                {
+                    "enable_format": True,
+                    "enable_transitions": True,
+                    "enable_zoom": True,
+                    "enable_subtitles": False,
+                    "animated_captions": False,
+                    "enable_cta": can_drawtext,
+                },
+                {
+                    "enable_format": False,
+                    "enable_transitions": False,
+                    "enable_zoom": False,
+                    "enable_subtitles": False,
+                    "animated_captions": False,
+                    "enable_cta": False,
+                },
             ]
 
             success = False
             last_output = ""
             for attempt_index, attempt in enumerate(attempts, start=1):
                 if thought_callback and attempt_index > 1:
-                    thought_callback(process_id, f"FFmpeg fallback {attempt_index}: simplifying render filters for clip {i+1}.")
+                    thought_callback(
+                        process_id, f"FFmpeg fallback {attempt_index}: simplifying render filters for clip {i + 1}."
+                    )
 
                 cmd = _build_ffmpeg_command(
                     video_path=video_path,
@@ -1063,13 +1259,13 @@ def cut_video(video_path: str, hooks: List[Dict], process_id: str = None, active
                             endscreen_duration,
                             process_id,
                             i + 1,
-                            thought_callback
+                            thought_callback,
                         )
                     break
 
             if not success:
-                print(f"Error cutting clip {i+1}: ffmpeg failed after retries. Output:\n{last_output}")
+                logger.error(f"Error cutting clip {i + 1}: ffmpeg failed after retries. Output:\n{last_output}")
         except Exception as e:
-            print(f"Error cutting clip {i+1}: {str(e)}")
-            
+            logger.error(f"Error cutting clip {i + 1}: {e}")
+
     return output_clips

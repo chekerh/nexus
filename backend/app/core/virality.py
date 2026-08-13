@@ -3,16 +3,23 @@
 Combines heuristic signals with optional AI analysis for a composite score.
 Mimics Opus Clip's Virality Score as a signature Nexus-UGC feature.
 """
+
 import json
 import re
-import ollama
-from typing import List, Dict, Optional
-from .config import settings
+from typing import cast
 
-VIRAL_SIGNALS = {
+import ollama
+
+from .config import settings
+from .model_router import get_ollama_model_for_task
+
+VIRAL_SIGNALS: dict[str, dict[str, str | int | None]] = {
     "hook_question": {"pattern": r"^(why|how|what|when|where|did you|have you|do you)", "weight": 15},
     "hook_number": {"pattern": r"\b\d+", "weight": 10},
-    "hook_curiosity": {"pattern": r"\b(secret|never|nobody|everyone|always|worst|best|ultimate|insane|crazy)\b", "weight": 20},
+    "hook_curiosity": {
+        "pattern": r"\b(secret|never|nobody|everyone|always|worst|best|ultimate|insane|crazy)\b",
+        "weight": 20,
+    },
     "hook_contrast": {"pattern": r"\b(but|however|yet|though|instead|unlike)\b", "weight": 12},
     "emotion_money": {"pattern": r"\b(money|cash|million|billion|profit|price|sell|save|cost)\b", "weight": 12},
     "emotion_fear": {"pattern": r"\b(danger|scam|mistake|failed|crash|warning|risk|problem|broken)\b", "weight": 10},
@@ -24,14 +31,17 @@ VIRAL_SIGNALS = {
     "duration_bonus": {"pattern": None, "weight": 5},
 }
 
-def _score_text_signals(text: str) -> Dict[str, float]:
-    scores = {}
+
+def _score_text_signals(text: str) -> dict[str, float]:
+    scores: dict[str, float] = {}
     for name, sig in VIRAL_SIGNALS.items():
-        if sig["pattern"] is None:
+        pattern = sig.get("pattern")
+        if pattern is None:
             continue
-        count = len(re.findall(sig["pattern"], text.lower()))
-        scores[name] = min(100, count * sig["weight"])
+        count = len(re.findall(cast(str, pattern), text.lower()))
+        scores[name] = min(100, count * cast(int, sig.get("weight", 0)))
     return scores
+
 
 def _score_duration(duration: float) -> float:
     if 15 <= duration <= 35:
@@ -43,8 +53,10 @@ def _score_duration(duration: float) -> float:
     else:
         return 40
 
+
 def _score_speech_density(density: float) -> float:
     return min(100, density * 100)
+
 
 def _heuristic_virality(text: str, duration: float, speech_density: float) -> float:
     signal_scores = _score_text_signals(text)
@@ -53,20 +65,22 @@ def _heuristic_virality(text: str, duration: float, speech_density: float) -> fl
     density_score = _score_speech_density(speech_density)
     return round(min(100, base * 0.5 + dur_score * 0.25 + density_score * 0.25), 1)
 
-def _ai_virality_analysis(texts: List[str]) -> Optional[List[float]]:
+
+def _ai_virality_analysis(texts: list[str]) -> list[float] | None:
     if not texts:
         return None
     try:
         system = (
             "You are a viral clip analyst. Rate each clip's virality potential from 1-100. "
             "Consider: hook strength, emotional triggers, curiosity gap, audience retention. "
-            "Output strict JSON: {\"scores\": [score1, score2, ...]}"
+            'Output strict JSON: {"scores": [score1, score2, ...]}'
         )
-        payload_lines = [f"Clip {i+1}: {t[:300]}" for i, t in enumerate(texts)]
+        payload_lines = [f"Clip {i + 1}: {t[:300]}" for i, t in enumerate(texts)]
         user = "\n".join(payload_lines)
 
+        virality_model = get_ollama_model_for_task("virality")
         response = ollama.chat(
-            model=settings.OLLAMA_MODEL,
+            model=virality_model,
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
@@ -85,10 +99,12 @@ def _ai_virality_analysis(texts: List[str]) -> Optional[List[float]]:
     except Exception:
         return None
 
+
 def score_clip(text: str, duration: float, speech_density: float = 0.5) -> float:
     return _heuristic_virality(text, duration, speech_density)
 
-def score_clips(hooks: List[Dict], transcript: str = "") -> List[Dict]:
+
+def score_clips(hooks: list[dict], transcript: str = "") -> list[dict]:
     if not hooks:
         return []
 
@@ -99,11 +115,13 @@ def score_clips(hooks: List[Dict], transcript: str = "") -> List[Dict]:
         if duration <= 0:
             duration = 30.0
         score = _heuristic_virality(text, duration, 0.7)
-        scored.append({
-            **hook,
-            "virality_score": score,
-            "virality_breakdown": _score_text_signals(text),
-        })
+        scored.append(
+            {
+                **hook,
+                "virality_score": score,
+                "virality_breakdown": _score_text_signals(text),
+            }
+        )
 
     texts = [h.get("caption", "") or h.get("hook_name", "") for h in hooks]
     ai_scores = _ai_virality_analysis(texts)
