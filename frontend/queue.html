@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en" data-i18n>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>N</text></svg>">
+  <meta name="description" content="View and manage your publishing queue. Approve, schedule, or cancel AI-generated video posts across platforms.">
+  <meta property="og:title" content="Post Queue — Nexus-UGC">
+  <meta property="og:description" content="View and manage your publishing queue. Approve, schedule, or cancel AI-generated video posts across platforms.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <title>Post Queue — Nexus-UGC</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="choko.css">
+  <meta name="theme-color" content="#0a0e17">
+  <meta name="robots" content="noindex">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-192.svg">
+</head>
+<body>
+  <a href="#main-content" class="skip-to-content" data-i18n="common.skip-to-content">Skip to content</a>
+  <noscript><div style="position:fixed;inset:0;z-index:9999;background:#05080f;color:#94a3b8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:2rem;text-align:center"><h1 style="color:#fff;font-size:1.5rem;margin:0">JavaScript Required</h1><p>Nexus-UGC requires JavaScript. Please enable it in your browser settings.</p></div></noscript>
+  <canvas id="particle-canvas"></canvas>
+
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <div class="brand-icon">N</div>
+      <a href="index.html"><span>Nexus<span class="gradient-text">UGC</span></span></a>
+    </div>
+    <button class="mobile-nav-toggle" aria-label="Toggle navigation">☰</button>
+    <div class="navbar-actions">
+      <span class="user-email" id="user-email"></span>
+      <button class="btn btn-ghost btn-sm" id="login-btn" data-i18n="common.sign-in">Sign In</button>
+      <button class="btn btn-ghost btn-sm hidden" id="logout-btn" data-i18n="common.logout">Logout</button>
+    </div>
+  </nav>
+
+  <div class="app-layout">
+    <aside class="sidebar">
+      <nav class="sidebar-nav">
+        <a href="index.html">📊 <span class="nav-label" data-i18n="nav.dashboard">Dashboard</span></a>
+        <a href="brainrot.html">🧠 <span class="nav-label" data-i18n="nav.brainrot">Brain Rot</span></a>
+        <a href="#" class="active">📋 <span class="nav-label" data-i18n="nav.queue">Post Queue</span></a>
+        <a href="templates.html">📋 <span class="nav-label" data-i18n="nav.templates">Templates</span></a>
+        <a href="calendar.html">📅 <span class="nav-label" data-i18n="nav.calendar">Calendar</span></a>
+        <a href="personas.html">👤 <span class="nav-label" data-i18n="nav.personas">Personas</span></a>
+        <a href="campaigns.html">🎯 <span class="nav-label" data-i18n="nav.campaigns">Campaigns</span></a>
+        <div class="sidebar-divider"></div>
+        <a href="accounts.html">🔗 <span class="nav-label" data-i18n="nav.accounts">Accounts</span></a>
+        <a href="setup.html">⚙️ <span class="nav-label" data-i18n="nav.setup">Setup</span></a>
+        <div class="sidebar-divider"></div>
+        <a href="billing.html">💳 <span class="nav-label" data-i18n="nav.billing">Billing</span></a>
+        <a href="settings.html">⚙️ <span class="nav-label" data-i18n="nav.settings">Settings</span></a>
+        <a href="admin-login.html">🔐 <span class="nav-label" data-i18n="nav.admin">Admin</span></a>
+      </nav>
+    </aside>
+
+    <main class="main-area" id="main-content">
+      <div class="page-header">
+        <div>
+          <h1>Post <span class="gradient-text">Queue</span></h1>
+          <p>Review, approve, and schedule content for auto-publishing.</p>
+        </div>
+        <div class="quick-actions">
+          <button class="btn btn-primary btn-sm" id="refresh-queue-btn">🔄 Refresh</button>
+          <span class="badge badge-info" id="queue-summary-badge">Loading...</span>
+        </div>
+      </div>
+
+      <!-- Summary Cards -->
+      <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:1.5rem;">
+        <div class="stat-card" style="border-left:3px solid var(--amber);">
+          <div class="stat-value" id="count-pending">0</div>
+          <div class="stat-label">Pending Review</div>
+        </div>
+        <div class="stat-card" style="border-left:3px solid var(--green);">
+          <div class="stat-value" id="count-approved">0</div>
+          <div class="stat-label">Approved</div>
+        </div>
+        <div class="stat-card" style="border-left:3px solid var(--cyan);">
+          <div class="stat-value" id="count-scheduled">0</div>
+          <div class="stat-label">Scheduled</div>
+        </div>
+        <div class="stat-card" style="border-left:3px solid var(--red);">
+          <div class="stat-value" id="count-failed">0</div>
+          <div class="stat-label">Failed</div>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="filter-bar">
+        <button class="filter-btn active" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="pending">Pending</button>
+        <button class="filter-btn" data-filter="approved">Approved</button>
+        <button class="filter-btn" data-filter="scheduled">Scheduled</button>
+        <button class="filter-btn" data-filter="failed">Failed</button>
+        <button class="filter-btn" data-filter="draft">Drafts</button>
+      </div>
+
+      <!-- Queue List -->
+      <div id="queue-list">
+        <div class="text-secondary text-center py-4">Loading queue...</div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Progress Modal -->
+  <div id="progress-modal" class="modal-overlay hidden">
+    <div class="modal-content" style="max-width:520px;">
+      <div class="modal-header">
+        <h3>Pipeline Progress</h3>
+        <button class="modal-close" id="progress-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="pulse-dot" id="progress-pulse"></span>
+          <span class="text-sm" id="progress-stage-label">Initializing...</span>
+          <span class="text-sm text-dim ml-auto" id="progress-pct-label">0%</span>
+        </div>
+        <div class="progress-bar" style="margin-bottom:1rem;">
+          <div class="progress-bar-fill" id="progress-modal-fill"></div>
+        </div>
+        <div id="progress-modal-console" class="thinking-console" style="max-height:300px;overflow-y:auto;">
+          <div class="thinking-line">Waiting for pipeline to start...</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger btn-sm" id="progress-stop-btn">Stop</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Schedule Modal -->
+  <div id="schedule-modal" class="modal-overlay hidden">
+    <div class="modal-content" style="max-width:400px;">
+      <div class="modal-header">
+        <h3>Schedule Post</h3>
+        <button class="modal-close" id="schedule-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Publish Date & Time</label>
+          <input type="datetime-local" id="schedule-datetime" class="form-input">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="schedule-cancel-btn">Cancel</button>
+        <button class="btn btn-primary" id="schedule-confirm-btn">Schedule</button>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    .queue-item { transition: opacity 0.2s, transform 0.2s; }
+    .queue-item:hover { transform: translateX(4px); }
+  </style>
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <script src="i18n.js"></script>
+  <script src="api.js"></script>
+  <script defer src="particles.js"></script>
+  <script defer src="ui.js"></script>
+  <script >
+    function _t(k, f) { return (typeof __ === 'function' ? __(k, f) : f); }
+    let currentFilter = 'all';
+    let allPosts = [];
+    let schedulePostId = null;
+
+    async function refreshQueue() {
+      document.getElementById('queue-list').innerHTML = `<div class="loading-pulse" style="text-align:center;padding:2rem;color:var(--text-dim);font-size:0.875rem;">${_t('queue.loading', 'Loading queue...')}</div>`;
+      try {
+        const res = await apiJSON('/posts', { method: 'GET' });
+        allPosts = res.posts || [];
+        renderQueue();
+      } catch (e) {
+        document.getElementById('queue-list').innerHTML =
+          `<div class="text-center py-4 text-danger">${_t('queue.failed-to-load', 'Failed to load queue')}: ${e.message}</div>`;
+      }
+    }
+
+    function setFilter(filter) {
+      currentFilter = filter;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === filter));
+      renderQueue();
+    }
+
+    function renderQueue() {
+      const filtered = currentFilter === 'all' ? allPosts : allPosts.filter(p => p.status === currentFilter);
+      const counts = { pending: 0, approved: 0, scheduled: 0, failed: 0, draft: 0 };
+      allPosts.forEach(p => { if (counts[p.status] !== undefined) counts[p.status]++; });
+      document.getElementById('count-pending').textContent = counts.pending;
+      document.getElementById('count-approved').textContent = counts.approved;
+      document.getElementById('count-scheduled').textContent = counts.scheduled;
+      document.getElementById('count-failed').textContent = counts.failed;
+      document.getElementById('queue-summary-badge').textContent = `${allPosts.length} ${_t('common.total', 'total')}`;
+
+      if (filtered.length === 0) {
+        document.getElementById('queue-list').innerHTML =
+          `<div class="empty-state"><div class="empty-state-icon">📋</div><h3>${_t('queue.no-posts-found', 'No posts found')}</h3><p>${_t('queue.no-posts-for-filter', 'No ' + currentFilter + ' posts yet. Generate content from the Brain Rot tool to see it here.')}</p></div>`;
+        return;
+      }
+
+      let html = '';
+      for (const post of filtered) {
+        const platformIcon = { youtube: '🎬', tiktok: '📱', instagram: '📸', twitter: '🐦', facebook: '👍', linkedin: '💼' };
+        const icon = platformIcon[post.platform] || '📄';
+        const scheduledAt = post.scheduled_at ? new Date(post.scheduled_at).toLocaleString() : '—';
+        const createdAt = post.created_at ? new Date(post.created_at).toLocaleString() : '—';
+        const postedAt = post.posted_at ? new Date(post.posted_at).toLocaleString() : '—';
+
+        html += `
+          <div class="content-card queue-item" data-status="${post.status}">
+            <div class="flex justify-between items-start">
+              <div style="flex:1;">
+                <div class="flex gap-1 items-center mb-1">
+                  <span style="font-size:1.25rem;">${icon}</span>
+                  <span class="badge badge-${statusBadge(post.status)}">${post.status}</span>
+                  <span class="text-secondary text-sm">${post.platform}</span>
+                  ${post.persona_id ? `<span class="text-secondary text-sm">· ${post.persona_id.slice(0,8)}</span>` : ''}
+                </div>
+                <strong class="text-sm" style="display:block;margin-bottom:0.25rem;">${escHtml(post.title || _t('common.untitled', 'Untitled'))}</strong>
+                ${post.body ? `<p class="text-secondary text-xs" style="max-width:600px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(post.body).slice(0,200)}</p>` : ''}
+                <div class="flex gap-2 text-xs text-secondary mt-1">
+                  <span>Created: ${createdAt}</span>
+                  ${post.scheduled_at ? `<span>Scheduled: ${scheduledAt}</span>` : ''}
+                  ${post.posted_at ? `<span>Posted: ${postedAt}</span>` : ''}
+                </div>
+                ${post.error ? `<p class="text-danger text-xs mt-1">${escHtml(post.error)}</p>` : ''}
+              </div>
+              <div class="flex gap-1 flex-wrap" style="flex-shrink:0;margin-left:1rem;">
+                ${post.status === 'pending' || post.status === 'draft' ? `
+                  <button class="btn btn-success btn-xs" data-action="approve" data-post-id="${post.id}">✓ Approve</button>
+                  <button class="btn btn-primary btn-xs" data-action="schedule" data-post-id="${post.id}">📅 Schedule</button>
+                  <button class="btn btn-danger btn-xs" data-action="cancel" data-post-id="${post.id}">✕ Cancel</button>
+                ` : ''}
+                ${post.status === 'approved' ? `
+                  <button class="btn btn-primary btn-xs" data-action="schedule" data-post-id="${post.id}">📅 Schedule</button>
+                  <button class="btn btn-danger btn-xs" data-action="cancel" data-post-id="${post.id}">✕ Cancel</button>
+                ` : ''}
+                ${post.status === 'scheduled' ? `
+                  <button class="btn btn-danger btn-xs" data-action="cancel" data-post-id="${post.id}">✕ Cancel</button>
+                  <button class="btn btn-primary btn-xs" data-action="schedule" data-post-id="${post.id}">📅 Reschedule</button>
+                ` : ''}
+                ${post.status === 'failed' ? `
+                  <button class="btn btn-primary btn-xs" data-action="retry" data-post-id="${post.id}">↻ Retry</button>
+                  <button class="btn btn-ghost btn-xs" data-action="cancel" data-post-id="${post.id}">✕ Dismiss</button>
+                ` : ''}
+              </div>
+            </div>
+          </div>`;
+      }
+      document.getElementById('queue-list').innerHTML = html;
+    }
+
+    function statusBadge(status) {
+      const map = { pending: 'warning', approved: 'success', scheduled: 'info', posted: 'success', failed: 'danger', draft: 'secondary' };
+      return map[status] || 'secondary';
+    }
+
+    async function approvePost(id) {
+      try {
+        await apiJSON(`/posts/${id}/approve`, { method: 'POST' });
+        showToast(_t('queue.approved', 'Post approved — will publish on next cycle'), 'success');
+        refreshQueue();
+      } catch (e) {
+        showToast(e.message || _t('queue.failed-to-approve', 'Failed to approve'), 'error');
+      }
+    }
+
+    function openSchedule(id) {
+      schedulePostId = id;
+      const now = new Date();
+      now.setMinutes(now.getMinutes() + 30);
+      document.getElementById('schedule-datetime').value = now.toISOString().slice(0, 16);
+      document.getElementById('schedule-modal').classList.remove('hidden');
+    }
+
+    function closeScheduleModal() {
+      document.getElementById('schedule-modal').classList.add('hidden');
+      schedulePostId = null;
+    }
+
+    async function confirmSchedule() {
+      const btn = document.getElementById('schedule-confirm-btn');
+      btn.disabled = true;
+      btn.textContent = _t('queue.scheduling', 'Scheduling...');
+      const dt = document.getElementById('schedule-datetime').value;
+      if (!dt) { showToast(_t('queue.select-datetime', 'Please select a date and time'), 'warning'); btn.disabled = false; btn.textContent = _t('common.schedule', 'Schedule'); return; }
+      try {
+        const scheduledAt = new Date(dt).toISOString();
+        await apiJSON(`/posts/${schedulePostId}/schedule`, { method: 'POST', body: { scheduled_at: scheduledAt } });
+        showToast(_t('queue.scheduled-for', `Post scheduled for ${new Date(scheduledAt).toLocaleString()}`), 'success');
+        closeScheduleModal();
+        refreshQueue();
+      } catch (e) {
+        showToast(e.message || _t('queue.failed-to-schedule', 'Failed to schedule'), 'error');
+        btn.disabled = false;
+        btn.textContent = _t('common.schedule', 'Schedule');
+      }
+    }
+
+    async function cancelPost(id) {
+      if (!await confirmDialog(_t('queue.cancel-confirm', 'Cancel this post?'))) return;
+      try {
+        await apiJSON(`/posts/${id}/cancel`, { method: 'POST' });
+        showToast(_t('queue.cancelled', 'Post has been cancelled'), 'warning');
+        refreshQueue();
+      } catch (e) {
+        showToast(e.message || _t('queue.failed-to-cancel', 'Failed to cancel'), 'error');
+      }
+    }
+
+    async function retryPost(id) {
+      try {
+        await apiJSON(`/posts/${id}`, { method: 'PUT', body: { status: 'pending' } });
+        showToast(_t('queue.retry', 'Post reset to pending — review and approve again'), 'info');
+        refreshQueue();
+      } catch (e) {
+        showToast(e.message || _t('queue.failed-to-retry', 'Failed to retry'), 'error');
+      }
+    }
+
+    // ── Progress Modal ──
+    let _progressSource = null;
+    let _progressProcessId = null;
+
+    function showProgressModal(processId) {
+      _progressProcessId = processId;
+      closeProgressModal(); // cleanup any existing connection
+      const modal = document.getElementById('progress-modal');
+      const console = document.getElementById('progress-modal-console');
+      const fill = document.getElementById('progress-modal-fill');
+      const stageLabel = document.getElementById('progress-stage-label');
+      const pctLabel = document.getElementById('progress-pct-label');
+      modal.classList.remove('hidden');
+      modal.querySelector('.modal-content').scrollIntoView({ behavior: 'smooth' });
+      console.innerHTML = '<div class="thinking-line">' + _t('queue.connecting-pipeline', 'Connecting to pipeline stream...') + '</div>';
+      fill.style.width = '0%';
+      stageLabel.textContent = _t('common.connecting', 'Connecting...');
+      pctLabel.textContent = '0%';
+
+      _progressSource = connectProgressSSE(processId, {
+        onThought(thought) {
+          const el = document.createElement('div');
+          el.className = 'thinking-line';
+          el.textContent = `> ${thought}`;
+          console.appendChild(el);
+          console.scrollTop = console.scrollHeight;
+        },
+        onStage(stage) {
+          const labels = {
+            initializing: _t('queue.stage-initializing', 'Initializing...'),
+            drive_download: _t('queue.stage-drive-download', 'Downloading from Drive...'),
+            transcription: _t('queue.stage-transcription', 'Transcribing Audio...'),
+            translation: _t('queue.stage-translation', 'Translating...'),
+            analysis: _t('queue.stage-analysis', 'Analyzing Content...'),
+            cutting: _t('queue.stage-cutting', 'Rendering Clips...'),
+            virality_scoring: _t('queue.stage-virality-scoring', 'Scoring Clips...'),
+            completed: _t('queue.stage-completed', 'Complete!'),
+            failed: _t('queue.stage-failed', 'Failed'),
+          };
+          stageLabel.textContent = labels[stage] || _t('queue.stage-processing', `Processing (${stage})...`);
+        },
+        onProgress(percent) {
+          fill.style.width = `${percent}%`;
+          pctLabel.textContent = `${percent}%`;
+        },
+        onMessage(msg) {
+          const el = document.createElement('div');
+          el.className = 'thinking-line';
+          el.textContent = `> ${msg}`;
+          console.appendChild(el);
+          console.scrollTop = console.scrollHeight;
+        },
+        onDone(data) {
+          fill.style.width = '100%';
+          pctLabel.textContent = '100%';
+          if (data.status === 'completed') {
+            stageLabel.textContent = _t('queue.pipeline-complete', '✅ Complete!');
+            const el = document.createElement('div');
+            el.className = 'thinking-line';
+            el.textContent = _t('queue.pipeline-complete-msg', '> Pipeline completed successfully.');
+            console.appendChild(el);
+            showToast(_t('queue.pipeline-complete-toast', 'Pipeline complete!'), 'success');
+          } else if (data.status === 'failed') {
+            stageLabel.textContent = _t('queue.pipeline-failed', '❌ Failed');
+            const el = document.createElement('div');
+            el.className = 'thinking-line error';
+            el.textContent = '> ' + _t('common.error', 'Error') + ': ' + (data.error || _t('common.unknown-error', 'Unknown error'));
+            console.appendChild(el);
+            showToast(data.error || _t('queue.pipeline-failed-toast', 'Pipeline failed'), 'error');
+          } else if (data.status === 'cancelled') {
+            stageLabel.textContent = _t('queue.pipeline-cancelled', '⛔ Cancelled');
+            const el = document.createElement('div');
+            el.className = 'thinking-line';
+            el.textContent = _t('queue.pipeline-cancelled-msg', '> Pipeline cancelled by user.');
+            console.appendChild(el);
+          }
+          document.getElementById('progress-pulse')?.classList.remove('pulse-dot');
+          document.getElementById('progress-stop-btn').disabled = true;
+          setTimeout(() => {
+            if (!modal.classList.contains('hidden')) closeProgressModal();
+          }, 3000);
+        },
+        onError() {
+          const el = document.createElement('div');
+          el.className = 'thinking-line error';
+          el.textContent = _t('queue.connection-lost', '> Connection lost. Falling back to polling.');
+          console.appendChild(el);
+        },
+      });
+    }
+
+    function closeProgressModal() {
+      if (_progressSource) {
+        _progressSource.close();
+        _progressSource = null;
+      }
+      _progressProcessId = null;
+      document.getElementById('progress-modal').classList.add('hidden');
+    }
+
+    // Click outside progress modal to close
+    document.getElementById('progress-modal').addEventListener('click', function(e) {
+      if (e.target === this) closeProgressModal();
+    });
+    document.getElementById('progress-close-btn')?.addEventListener('click', closeProgressModal);
+    document.getElementById('progress-stop-btn')?.addEventListener('click', async function() {
+      if (!_progressProcessId) return;
+      this.disabled = true;
+      const origText = this.textContent;
+      try {
+        await apiJSON(`/cancel/${_progressProcessId}`, { method: 'POST' });
+        showToast(_t('queue.cancelling-pipeline', 'Cancelling pipeline...'), 'warning');
+      } catch (e) {
+        showToast(e.message || _t('queue.failed-to-cancel-pipeline', 'Failed to cancel'), 'error');
+      } finally {
+        this.disabled = false;
+        this.textContent = origText;
+      }
+    });
+
+    // Click outside schedule modal to close
+    document.getElementById('schedule-modal').addEventListener('click', function(e) {
+      if (e.target === this) closeScheduleModal();
+    });
+
+    // ── Event binding (replaces all inline onclick handlers) ──
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // Refresh button
+      document.getElementById('refresh-queue-btn')?.addEventListener('click', refreshQueue);
+
+      // Filter bar delegation
+      document.querySelector('.filter-bar')?.addEventListener('click', e => {
+        const btn = e.target.closest('.filter-btn');
+        if (btn) setFilter(btn.dataset.filter);
+      });
+
+      // Schedule modal buttons
+      document.getElementById('schedule-close-btn')?.addEventListener('click', closeScheduleModal);
+      document.getElementById('schedule-cancel-btn')?.addEventListener('click', closeScheduleModal);
+      document.getElementById('schedule-confirm-btn')?.addEventListener('click', confirmSchedule);
+
+      // Queue action delegation (approve, schedule, cancel, retry)
+      document.getElementById('queue-list')?.addEventListener('click', async e => {
+        const btn = e.target.closest('[data-action]');
+        if (!btn) return;
+        const id = btn.dataset.postId;
+        btn.disabled = true;
+        try {
+          switch (btn.dataset.action) {
+            case 'approve': await approvePost(id); break;
+            case 'schedule': openSchedule(id); break;
+            case 'cancel': await cancelPost(id); break;
+            case 'retry': await retryPost(id); break;
+          }
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      if (isAuthenticated()) {
+        refreshQueue();
+        checkCreditLimit();
+      } else {
+        document.getElementById('queue-list').innerHTML =
+          '<div class="text-center py-4"><p class="text-secondary">' + _t('queue.sign-in-prompt', 'Sign in to manage your post queue.') + '</p></div>';
+      }
+      // Auto-refresh every 30s
+      registerInterval(setInterval(refreshQueue, 30000));
+    });
+  </script>
+  <script defer src="choko-knowledge.js"></script>
+  <script defer src="choko.js"></script>
+</body>
+</html>
