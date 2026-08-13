@@ -1,9 +1,7 @@
 """Tests for publishing API endpoint validation and security."""
 
 import os
-from datetime import UTC, datetime, timedelta
 
-from backend.app.core.publisher import SUPPORTED_PLATFORMS
 from backend.app.models.account import SocialAccount
 from backend.app.models.publish_history import PublishHistory
 

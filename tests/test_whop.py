@@ -7,10 +7,15 @@ from backend.app.models.whop import WhopLicense
 
 
 def test_whop_validate_applies_tier(client, auth_headers, db, test_user, monkeypatch):
-    monkeypatch.setattr("backend.app.api.v1.whop.map_product_to_tier", lambda product_id: "pro")
+    monkeypatch.setattr("backend.app.api.v1.whop.map_product_to_tier", lambda _product_id: "pro")
     monkeypatch.setattr(
         "backend.app.api.v1.whop.validate_license_key",
-        lambda license_key: {"id": "purchase-1", "status": "active", "product_id": "product-pro", "user": {"id": "customer-1"}},
+        lambda _license_key: {
+            "id": "purchase-1",
+            "status": "active",
+            "product_id": "product-pro",
+            "user": {"id": "customer-1"},
+        },
     )
 
     resp = client.post("/api/v1/whop/validate", json={"license_key": "whop-abc"}, headers=auth_headers)
@@ -28,15 +33,25 @@ def test_whop_validate_applies_tier(client, auth_headers, db, test_user, monkeyp
 
 
 def test_whop_claim_creates_user_and_token(client, db, monkeypatch):
-    monkeypatch.setattr("backend.app.api.v1.whop.map_product_to_tier", lambda product_id: "enterprise")
+    monkeypatch.setattr("backend.app.api.v1.whop.map_product_to_tier", lambda _product_id: "enterprise")
     monkeypatch.setattr(
         "backend.app.api.v1.whop.validate_license_key",
-        lambda license_key: {"id": "purchase-2", "status": "active", "product_id": "product-enterprise", "user": {"id": "customer-2"}},
+        lambda _license_key: {
+            "id": "purchase-2",
+            "status": "active",
+            "product_id": "product-enterprise",
+            "user": {"id": "customer-2"},
+        },
     )
 
     resp = client.post(
         "/api/v1/whop/claim",
-        json={"license_key": "whop-enterprise", "email": "whop@example.com", "password": "secret123", "display_name": "Whop User"},
+        json={
+            "license_key": "whop-enterprise",
+            "email": "whop@example.com",
+            "password": "secret123",
+            "display_name": "Whop User",
+        },
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -59,7 +74,7 @@ def test_whop_webhook_purchase_provisions_account(client, db, monkeypatch):
             "user": {"id": "customer-123", "email": "whop-purchase@example.com"},
         },
     }
-    monkeypatch.setattr("backend.app.services.whop.map_product_to_tier", lambda product_id: "pro")
+    monkeypatch.setattr("backend.app.services.whop.map_product_to_tier", lambda _product_id: "pro")
 
     resp = client.post(
         "/api/v1/whop/webhook",

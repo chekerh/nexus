@@ -1,7 +1,5 @@
 import os
-import shutil
 import pathlib
-import json
 
 from backend.app.core.publisher import publish_clip
 from backend.app.core.security import encrypt_token
@@ -58,8 +56,8 @@ def test_publish_mock(client, db, test_user, auth_headers, tmp_path, monkeypatch
         log_path = settings.PUBLISH_LOG_PATH
     assert os.path.exists(log_path)
     with open(log_path) as f:
-        lines = [l.strip() for l in f.readlines() if l.strip()]
-    assert any("Dev YouTube" in l or "Integration Test" in l for l in lines)
+        lines = [line.strip() for line in f.readlines() if line.strip()]
+    assert any("Dev YouTube" in line or "Integration Test" in line for line in lines)
 
 
 def test_publish_uses_system_credentials_when_account_has_none(monkeypatch, tmp_path):
@@ -72,8 +70,10 @@ def test_publish_uses_system_credentials_when_account_has_none(monkeypatch, tmp_
     monkeypatch.setattr("backend.app.core.publisher.settings.YOUTUBE_CLIENT_ID", "youtube-client")
     monkeypatch.setattr("backend.app.core.publisher.settings.YOUTUBE_CLIENT_SECRET", "youtube-secret")
 
-    monkeypatch.setattr("backend.app.core.publisher._youtube_access_token", lambda *_args, **_kwargs: "system-access-token")
-    monkeypatch.setattr("backend.app.core.publisher._youtube_upload_video", lambda **kwargs: "system-video-id")
+    monkeypatch.setattr(
+        "backend.app.core.publisher._youtube_access_token", lambda *_args, **_kwargs: "system-access-token"
+    )
+    monkeypatch.setattr("backend.app.core.publisher._youtube_upload_video", lambda **_kwargs: "system-video-id")
 
     result = publish_clip(
         platform="youtube",

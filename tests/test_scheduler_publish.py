@@ -4,7 +4,6 @@ from datetime import UTC, datetime, timedelta
 from backend.app.models.account import SocialAccount
 from backend.app.models.persona import Persona, Post
 from backend.app.services.scheduler import publish_scheduled_post
-from backend.app.core.security import encrypt_token
 
 
 def test_scheduler_publishes_due_post(client, db, test_user, auth_headers, monkeypatch, tmp_path):
@@ -62,5 +61,5 @@ def test_scheduler_publishes_due_post(client, db, test_user, auth_headers, monke
     log_path = settings.PUBLISH_LOG_PATH
     assert os.path.exists(log_path)
     with open(log_path) as f:
-        lines = [l.strip() for l in f.readlines() if l.strip()]
-    assert any("Scheduled Test" in l or "sched_sample" in l for l in lines)
+        lines = [line.strip() for line in f.readlines() if line.strip()]
+    assert any("Scheduled Test" in line or "sched_sample" in line for line in lines)
