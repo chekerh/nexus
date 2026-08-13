@@ -1,16 +1,21 @@
-fastapi>=0.115.0
-uvicorn[standard]>=0.32.0
-pydantic-settings>=2.5.0
-python-multipart>=0.0.12
-httpx>=0.27.0
-ollama>=0.4.0
-ffmpeg-python>=0.2.0
-requests>=2.32.0
-cryptography>=41.0.0
-sqlalchemy>=2.0.0
-PyJWT>=2.9.0
-stripe>=10.0.0
-alembic>=1.13.0
-python-dotenv>=1.0.0
+fastapi==0.135.2
+uvicorn[standard]==0.42.0
+pydantic-settings==2.14.2
+python-multipart==0.0.31
+httpx==0.28.1
+ollama==0.6.1
+ffmpeg-python==0.2.0
+requests==2.33.1
+cryptography==50.0.0
+sqlalchemy==2.0.50
+PyJWT==2.13.0
+stripe==15.2.0
+alembic==1.18.4
+python-dotenv==1.2.2
+Pillow==12.3.0
+gTTS==2.5.4
+gunicorn==26.0.0
+google-auth==2.53.0
+prometheus-client==0.25.0
 # Optional: psycopg2-binary for PostgreSQL
 # Optional: airllm for experimental inference backend

@@ -3,18 +3,23 @@
 Replaces the in-memory processing_results dict with persistent storage.
 A background worker thread polls for pending jobs and executes the pipeline.
 """
+
+import contextlib
 import json
+import logging
 import os
 import signal
 import threading
 import time
-from datetime import datetime, timezone
-from typing import Optional, Callable
+from collections.abc import Callable
+from datetime import UTC, datetime
+
 from sqlalchemy.orm import Session
 
 from ..core.database import SessionLocal
 from ..models.job import Job
-from ..core.config import settings
+
+logger = logging.getLogger("nexus.job_queue")
 
 
 class JobQueue:
@@ -24,11 +29,23 @@ class JobQueue:
         self._active_pids: dict[str, int] = {}
         self._pipeline_runner = None
         self._lock = threading.Lock()
-        self._worker_thread: Optional[threading.Thread] = None
+        self._worker_thread: threading.Thread | None = None
         self._running = False
 
     def set_pipeline_runner(self, runner: Callable):
         self._pipeline_runner = runner
+
+    def reap_stale_jobs(self):
+        """Reset jobs stuck in 'running' on startup back to 'pending'."""
+        db = SessionLocal()
+        try:
+            stale = db.query(Job).filter(Job.status == "running").all()
+            for job in stale:
+                job.status = "pending"
+            if stale:
+                db.commit()
+        finally:
+            db.close()
 
     def start_worker(self):
         if self._running:
@@ -37,8 +54,10 @@ class JobQueue:
         self._worker_thread = threading.Thread(target=self._poll_loop, daemon=True)
         self._worker_thread.start()
 
-    def stop_worker(self):
+    def stop_worker(self, timeout: float = 30):
         self._running = False
+        if self._worker_thread and self._worker_thread.is_alive():
+            self._worker_thread.join(timeout=timeout)
 
     def _poll_loop(self):
         while self._running:
@@ -49,19 +68,28 @@ class JobQueue:
                     if job and self._pipeline_runner:
                         with self._lock:
                             job.status = "running"
-                            job.started_at = datetime.now(timezone.utc)
+                            job.started_at = datetime.now(UTC)
                             db.commit()
                         self._pipeline_runner(job.id)
                 finally:
                     db.close()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.error("Poll loop error: %s", exc)
             time.sleep(2)
 
-    def enqueue(self, db: Session, user_id: str, filename: str = "", video_path: str = "",
-                endscreen_path: str = "", cta_text: str = "Link in bio to try it free.",
-                source: str = "upload", drive_url: str = "", target_language: str = "en",
-                aspect_ratio: str = "vertical_9_16") -> str:
+    def enqueue(
+        self,
+        db: Session,
+        user_id: str,
+        filename: str = "",
+        video_path: str = "",
+        endscreen_path: str = "",
+        cta_text: str = "Link in bio to try it free.",
+        source: str = "upload",
+        drive_url: str = "",
+        target_language: str = "en",
+        aspect_ratio: str = "vertical_9_16",
+    ) -> str:
         job = Job(
             user_id=user_id,
             filename=filename,
@@ -80,12 +108,11 @@ class JobQueue:
         db.refresh(job)
         return job.id
 
-    def get_job(self, db: Session, job_id: str) -> Optional[Job]:
+    def get_job(self, db: Session, job_id: str) -> Job | None:
         return db.query(Job).filter(Job.id == job_id).first()
 
     def get_user_jobs(self, db: Session, user_id: str, limit: int = 50) -> list[Job]:
-        return (db.query(Job).filter(Job.user_id == user_id)
-                .order_by(Job.created_at.desc()).limit(limit).all())
+        return db.query(Job).filter(Job.user_id == user_id).order_by(Job.created_at.desc()).limit(limit).all()
 
     def cancel_job(self, db: Session, job_id: str) -> bool:
         job = self.get_job(db, job_id)
@@ -97,10 +124,8 @@ class JobQueue:
         with self._lock:
             pid = self._active_pids.pop(job_id, None)
         if pid:
-            try:
+            with contextlib.suppress(Exception):
                 os.killpg(os.getpgid(pid), signal.SIGKILL)
-            except Exception:
-                pass
         return True
 
     def add_thought(self, job_id: str, thought: str):
@@ -116,6 +141,23 @@ class JobQueue:
             job.thinking_json = json.dumps(thoughts)
             if job.status != "running":
                 job.status = "running"
+            db.commit()
+        finally:
+            db.close()
+
+    def set_progress(self, job_id: str, stage: str = "", percent: int = 0, message: str = ""):
+        """Update job progress for SSE streaming."""
+        db = SessionLocal()
+        try:
+            job = db.query(Job).filter(Job.id == job_id).first()
+            if not job:
+                return
+            if stage:
+                job.progress_stage = stage
+            if percent >= 0:
+                job.progress_percent = max(0, min(100, percent))
+            if message:
+                job.progress_message = message
             db.commit()
         finally:
             db.close()

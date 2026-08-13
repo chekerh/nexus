@@ -1,6 +1,5 @@
-import importlib
+import importlib.util
 import threading
-from typing import Optional, Tuple
 
 from .config import settings
 
@@ -15,7 +14,7 @@ class AirLLMService:
     def is_available(self) -> bool:
         return importlib.util.find_spec("airllm") is not None
 
-    def ensure_loaded(self) -> Tuple[bool, str]:
+    def ensure_loaded(self) -> tuple[bool, str]:
         """Loads model once and reuses it for subsequent requests."""
         if not self.is_available():
             return False, "airllm package not installed"
@@ -44,7 +43,7 @@ class AirLLMService:
                 self._last_error = str(e)
                 return False, f"airllm load failed: {e}"
 
-    def unload(self) -> Tuple[bool, str]:
+    def unload(self) -> tuple[bool, str]:
         with self._lock:
             if self._model is None:
                 return True, "airllm model already unloaded"
@@ -53,11 +52,13 @@ class AirLLMService:
                 self._model_id = ""
                 try:
                     import gc
+
                     gc.collect()
                 except Exception:
                     pass
                 try:
                     import torch
+
                     if torch.cuda.is_available():
                         torch.cuda.empty_cache()
                     elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
@@ -78,7 +79,7 @@ class AirLLMService:
             "compression": (settings.AIRLLM_COMPRESSION or "").strip() or "none",
         }
 
-    def generate(self, prompt: str, max_length: int, max_new_tokens: int) -> Optional[str]:
+    def generate(self, prompt: str, max_length: int, max_new_tokens: int) -> str | None:
         ok, _ = self.ensure_loaded()
         if not ok or self._model is None:
             return None
@@ -96,6 +97,7 @@ class AirLLMService:
             input_ids = input_tokens["input_ids"]
             try:
                 import torch
+
                 if torch.cuda.is_available():
                     input_ids = input_ids.cuda()
                 elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():

@@ -1,0 +1,233 @@
+{
+  "brain_rot": {
+    "label": "Brain Rot",
+    "description": "Bold Impact font, white with heavy black border — classic TikTok style",
+    "font": "Impact",
+    "fontsize": 56,
+    "fontcolor": "white",
+    "borderw": 4,
+    "bordercolor": "black",
+    "animation": "none",
+    "position": "center"
+  },
+  "hype": {
+    "label": "Hype",
+    "description": "Yellow Arial-Bold with red border — energetic and attention-grabbing",
+    "font": "Arial-Bold",
+    "fontsize": 64,
+    "fontcolor": "yellow",
+    "borderw": 3,
+    "bordercolor": "red",
+    "animation": "pop",
+    "position": "center"
+  },
+  "clean": {
+    "label": "Clean",
+    "description": "Minimal Helvetica white text with subtle border — modern and understated",
+    "font": "Helvetica",
+    "fontsize": 48,
+    "fontcolor": "white",
+    "borderw": 2,
+    "bordercolor": "black",
+    "animation": "none",
+    "position": "center"
+  },
+  "neon": {
+    "label": "Neon",
+    "description": "Cyan neon glow text on dark background — cyberpunk aesthetic",
+    "font": "Arial-Black",
+    "fontsize": 58,
+    "fontcolor": "#00ffcc",
+    "borderw": 3,
+    "bordercolor": "#003322",
+    "animation": "glow",
+    "position": "center"
+  },
+  "retro": {
+    "label": "Retro",
+    "description": "Orange pixel-style text with warm border — 80s arcade feel",
+    "font": "Courier-Bold",
+    "fontsize": 52,
+    "fontcolor": "#ff8800",
+    "borderw": 3,
+    "bordercolor": "#442200",
+    "animation": "none",
+    "position": "center"
+  },
+  "minimal_white": {
+    "label": "Minimal White",
+    "description": "Thin white text with barely-visible shadow — elegant and premium",
+    "font": "Helvetica-Light",
+    "fontsize": 44,
+    "fontcolor": "white",
+    "borderw": 1,
+    "bordercolor": "black@0.3",
+    "animation": "fade",
+    "position": "center"
+  },
+  "gradient": {
+    "label": "Gradient",
+    "description": "Text with pink-to-purple gradient — vibrant and modern",
+    "font": "Arial-Bold",
+    "fontsize": 56,
+    "fontcolor": "#ff66cc",
+    "borderw": 3,
+    "bordercolor": "#660044",
+    "animation": "none",
+    "position": "center"
+  },
+  "outline": {
+    "label": "Outline",
+    "description": "Hollow outlined text — artistic and edgy",
+    "font": "Arial-Black",
+    "fontsize": 60,
+    "fontcolor": "white",
+    "borderw": 5,
+    "bordercolor": "black",
+    "animation": "none",
+    "position": "center"
+  },
+  "typewriter": {
+    "label": "Typewriter",
+    "description": "Monospaced typewriter font — vintage document feel",
+    "font": "Courier",
+    "fontsize": 48,
+    "fontcolor": "#cccccc",
+    "borderw": 2,
+    "bordercolor": "#333333",
+    "animation": "typewriter",
+    "position": "center"
+  },
+  "bounce": {
+    "label": "Bounce",
+    "description": "Playful text that bounces with beat — energetic and fun",
+    "font": "Comic-Sans-Bold",
+    "fontsize": 54,
+    "fontcolor": "#ffdd00",
+    "borderw": 3,
+    "bordercolor": "#664400",
+    "animation": "bounce",
+    "position": "center"
+  },
+  "glitch": {
+    "label": "Glitch",
+    "description": "RGB-split glitch effect — cyberpunk hacker aesthetic",
+    "font": "Arial-Black",
+    "fontsize": 60,
+    "fontcolor": "white",
+    "borderw": 4,
+    "bordercolor": "#ff00ff",
+    "animation": "glitch",
+    "position": "center"
+  },
+  "highlight": {
+    "label": "Highlight",
+    "description": "Text with colored background highlight — YouTube thumbnail style",
+    "font": "Arial-Bold",
+    "fontsize": 52,
+    "fontcolor": "white",
+    "borderw": 2,
+    "bordercolor": "#0044aa",
+    "animation": "none",
+    "position": "center"
+  },
+  "quote": {
+    "label": "Quote",
+    "description": "Italic serif text with quotation marks — elegant pull-quote",
+    "font": "Times-Bold-Italic",
+    "fontsize": 50,
+    "fontcolor": "#d4a574",
+    "borderw": 2,
+    "bordercolor": "#3a2211",
+    "animation": "fade",
+    "position": "center"
+  },
+  "split": {
+    "label": "Split",
+    "description": "Text split across two lines — dynamic visual flow",
+    "font": "Arial-Bold",
+    "fontsize": 52,
+    "fontcolor": "white",
+    "borderw": 3,
+    "bordercolor": "black",
+    "animation": "pop",
+    "position": "center"
+  },
+  "karaoke": {
+    "label": "Karaoke",
+    "description": "Word-by-word highlight in sync with speech — sing-along style",
+    "font": "Arial",
+    "fontsize": 56,
+    "fontcolor": "white",
+    "borderw": 3,
+    "bordercolor": "black",
+    "animation": "karaoke",
+    "position": "center"
+  },
+  "emoji_grid": {
+    "label": "Emoji Grid",
+    "description": "Text with relevant emojis sprinkled throughout — social media fun",
+    "font": "Helvetica",
+    "fontsize": 48,
+    "fontcolor": "white",
+    "borderw": 2,
+    "bordercolor": "black",
+    "animation": "none",
+    "position": "center"
+  },
+  "ticker": {
+    "label": "Ticker",
+    "description": "Scrolling news ticker style — breaking news feel",
+    "font": "Arial-Bold",
+    "fontsize": 46,
+    "fontcolor": "#ff4444",
+    "borderw": 2,
+    "bordercolor": "black",
+    "animation": "scroll",
+    "position": "bottom"
+  },
+  "cinematic": {
+    "label": "Cinematic",
+    "description": "Thin white text with letterbox bars — movie subtitle style",
+    "font": "Arial",
+    "fontsize": 42,
+    "fontcolor": "white",
+    "borderw": 1,
+    "bordercolor": "black@0.5",
+    "animation": "fade",
+    "position": "bottom"
+  },
+  "impact": {
+    "label": "Impact",
+    "description": "Ultra-bold thick text filling the frame — maximum emphasis",
+    "font": "Arial-Black",
+    "fontsize": 66,
+    "fontcolor": "white",
+    "borderw": 5,
+    "bordercolor": "black",
+    "animation": "pop",
+    "position": "center"
+  },
+  "money": {
+    "label": "Money",
+    "description": "Gold text with shimmer — financial advice aesthetic",
+    "font": "Arial-Bold",
+    "fontsize": 56,
+    "fontcolor": "#ffd700",
+    "borderw": 3,
+    "bordercolor": "#4a3500",
+    "animation": "glow",
+    "position": "center"
+  },
+  "warning": {
+    "label": "Warning",
+    "description": "Red alert-style text — urgent, attention-demanding",
+    "font": "Arial-Black",
+    "fontsize": 60,
+    "fontcolor": "#ff2200",
+    "borderw": 3,
+    "bordercolor": "#440000",
+    "animation": "shake",
+    "position": "center"
+  }
+}

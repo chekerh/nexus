@@ -11,28 +11,26 @@ env:
 
 jobs:
   lint:
-    name: Lint (ruff)
+    name: Lint (ruff + bandit)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install dependencies
+      - name: Install lint tools
         run: |
           python -m pip install --upgrade pip
-          pip install ruff
+          pip install ruff bandit
       - name: Run ruff linter
         run: ruff check backend/ tests/
       - name: Run ruff formatter check
         run: ruff format --check backend/ tests/
-      - name: Security lint (bandit)
-        run: |
-          pip install bandit
-          bandit -r backend/ -c pyproject.toml 2>&1 || echo "Bandit warnings found (non-blocking)"
+      - name: Security lint (bandit, blocking on Medium+)
+        run: bandit -r backend/ -c pyproject.toml -ll
 
   typecheck:
-    name: Typecheck (mypy)
+    name: Typecheck (mypy) + import/bytecode smoke
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -45,9 +43,18 @@ jobs:
           pip install -r requirements.txt mypy
       - name: Run mypy
         run: mypy backend/
+      - name: Bytecode compile check
+        run: python -m compileall -q backend/
+      - name: App import smoke
+        run: python -c "from backend.app.main import app"
+        env:
+          SECRET_KEY: test-secret-key-not-for-production
+          ENCRYPTION_KEY: test-encryption-key-not-for-prod
+          JWT_SECRET: test-jwt-secret-for-ci
+          DATABASE_URL: sqlite:///tmp/test-nexus.db
 
   test:
-    name: Test (pytest)
+    name: Test (pytest) + vuln scan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -62,12 +69,42 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
-      - name: Dependency vulnerability scan
+      - name: Dependency vulnerability scan (blocking)
         run: |
           pip install pip-audit
-          pip-audit --desc on 2>&1 || echo "Vulnerabilities found (non-blocking for now)"
-      - name: Run tests
-        run: python -m pytest tests/ -v --tb=short
+          # PYSEC-2026-2132 (click.edit): gTTS==2.5.4 pins click<8.2; fix is 8.3.3.
+          # click.edit() is an interactive editor helper unused by the app or
+          # gTTS's library path. Everything else stays blocking.
+          pip-audit --desc on -r requirements.txt --ignore-vuln PYSEC-2026-2132
+      - name: Run tests with coverage floor
+        run: python -m pytest tests/ -q --tb=short --cov=backend --cov-report=term-missing --cov-fail-under=30
+        env:
+          SECRET_KEY: test-secret-key-not-for-production
+          ENCRYPTION_KEY: test-encryption-key-not-for-prod
+          JWT_SECRET: test-jwt-secret-for-ci
+          DATABASE_URL: sqlite:///tmp/test-nexus.db
+
+  frontend:
+    name: Frontend (JS syntax + API reference integrity)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: JS syntax check
+        run: |
+          set -e
+          for f in frontend/*.js; do
+            node --check "$f"
+            echo "OK $f"
+          done
+      - name: API reference integrity check
+        run: python scripts/check_api_refs.py
         env:
           SECRET_KEY: test-secret-key-not-for-production
           ENCRYPTION_KEY: test-encryption-key-not-for-prod
@@ -98,7 +135,7 @@ jobs:
   docker:
     name: Docker build
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, test, smoke]
+    needs: [lint, typecheck, test, frontend, smoke]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     steps:
       - uses: actions/checkout@v4

@@ -48,7 +48,9 @@ def test_youtube_callback_persists_tokens(client, auth_headers, db, test_user, m
     resp = client.get(f"/api/v1/oauth/youtube/callback?code=test-code&state={state}")
     assert resp.status_code == 200
 
-    account = db.query(SocialAccount).filter(SocialAccount.user_id == user.id, SocialAccount.platform == "youtube").first()
+    account = (
+        db.query(SocialAccount).filter(SocialAccount.user_id == user.id, SocialAccount.platform == "youtube").first()
+    )
     assert account is not None
     assert account.account_name == "Test Channel"
     assert decrypt_token(account.oauth_refresh_token_enc) == "yt-refresh"
