@@ -330,13 +330,30 @@ cleanup() {
     echo "Stopping Ollama (PID $OLLAMA_PID)..."
     kill "$OLLAMA_PID" >/dev/null 2>&1 || true
   fi
+  if [[ -n "${PUBLISH_WORKER_PID:-}" ]]; then
+    echo "Stopping publish worker (PID $PUBLISH_WORKER_PID)..."
+    kill "$PUBLISH_WORKER_PID" >/dev/null 2>&1 || true
+  fi
 }
 trap cleanup EXIT INT TERM
 
 # ──────────────────────────────────────────────
-# 11) Start app
+# 11) Start auto-publish worker
 # ──────────────────────────────────────────────
-JWT_SECRET_VAL="$(read_env JWT_SECRET)"
+PUBLISH_WORKER_PID=""
+if [[ "$(read_env DEV_PUBLISH_MOCK)" == "true" ]]; then
+  echo "Starting dev publish mock worker..."
+  python -m backend.app.services.publisher --mock &
+  PUBLISH_WORKER_PID=$!
+elif [[ -n "$(read_env PUBLISH_SCHEDULE_CRON)" ]]; then
+  echo "Starting scheduled publish worker (cron: $PUBLISH_SCHEDULE_CRON)..."
+  python -m backend.app.services.scheduler &
+  PUBLISH_WORKER_PID=$!
+else
+  echo "Starting default publish scheduler (60s poll interval)..."
+  python -m backend.app.services.scheduler &
+  PUBLISH_WORKER_PID=$!
+fi
 if [[ "$JWT_SECRET_VAL" == "nexus-dev-secret-change-in-production" ]]; then
   echo "  Generating secure JWT secret..."
   NEW_SECRET="$(python3 -c "import secrets; print(secrets.token_hex(32))")"
@@ -400,4 +417,4 @@ echo "  Nexus-UGC is running at http://${HOST}:${PORT}"
 echo "  Press Ctrl+C to stop"
 echo "═══════════════════════════════════════════════════════════════"
 
-wait $UVICORN_PID
+wait $UVICORN_PID $PUBLISH_WORKER_PID

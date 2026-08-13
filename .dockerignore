@@ -1,5 +1,4 @@
-.venv
-venv
+*venv*/
 .git
 .gitignore
 __pycache__
@@ -14,3 +13,12 @@ backend/data/accounts.json
 backend/data/account_groups.json
 backend/data/publish_history.json
 node_modules
+alembic/versions/
+tests/
+docs/
+research/
+business/
+architecture/
+prompts/
+logs/
+scripts/
