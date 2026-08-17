@@ -10,7 +10,7 @@ cryptography==50.0.0
 sqlalchemy==2.0.50
 PyJWT==2.13.0
 stripe==15.2.0
-alembic==1.18.4
+alembic==1.19.1
 python-dotenv==1.2.2
 Pillow==12.3.0
 gTTS==2.5.4
