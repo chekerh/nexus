@@ -15,7 +15,7 @@ python-dotenv==1.2.2
 Pillow==12.3.0
 gTTS==2.5.4
 gunicorn==26.0.0
-google-auth==2.53.0
+google-auth==2.56.3
 prometheus-client==0.25.0
 # Optional: psycopg2-binary for PostgreSQL
 # Optional: airllm for experimental inference backend
